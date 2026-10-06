@@ -309,3 +309,49 @@ transformer with the full stream in context has any "maintained state" to find,
 or whether retrieval-on-demand makes the human working-memory framing the wrong
 import. A paradigm where the content must be held *across a context boundary*
 would settle it, and nothing we have built so far tests that.
+
+---
+
+## 7. Forced demand and retro cue (Experiment 2, `prod`, Qwen3.6-27B)
+
+Spec: `specs/forced-demand-and-retro-cue.md`. Same streams as single_cue (joined on
+`(stream_id, c_t)`), band (38, 54), `rank_wordlike`, J-lens, in-band band-min,
+`k = 25`, answer position. forced_demand: 150 streams; retro_cue: 60 streams. Fallback question
+not used (D18).
+
+### 7a. forced_demand (Experiment 2a): "list all, alphabetical"
+
+`t1…t6` = presence of the target that is alphabetically 1st…6th (the intended
+emission order). Logit-lens column = targets present per stream under the
+logit lens.
+
+| C_t | n | targets / stream (sem) | t1 | t2 | t3 | t4 | t5 | t6 | replaced | tracked labels | untracked labels | untracked words | word floor | label floor | logit-lens targets / stream | Q1 top-1 | Q1 median rank | list correct |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 30 | 0.867 (0.115) | 0.467 | 0.400 | | | | | 0.417 | 0.263 | 0.041 | 0.002 | 0.096 | 0.000 | 0.667 | 33% | 2 | 37% |
+| 3 | 30 | 0.967 (0.112) | 0.433 | 0.400 | 0.133 | | | | 0.261 | 0.194 | 0.028 | 0.009 | 0.054 | 0.000 | 0.367 | 43% | 2 | 20% |
+| 4 | 30 | 0.700 (0.098) | 0.300 | 0.300 | 0.067 | 0.033 | | | 0.171 | 0.134 | 0.078 | 0.011 | 0.062 | 0.000 | 0.333 | 17% | 3 | 0% |
+| 5 | 30 | 0.800 (0.088) | 0.300 | 0.167 | 0.167 | 0.133 | 0.033 | | 0.120 | 0.119 | 0.034 | 0.015 | 0.062 | 0.000 | 0.300 | 23% | 2.5 | 0% |
+| 6 | 30 | 0.633 (0.131) | 0.300 | 0.100 | 0.067 | 0.100 | 0.033 | 0.033 | 0.094 | 0.129 | 0.011 | 0.006 | 0.050 | 0.000 | 0.067 | 30% | 3 | 0% |
+
+single_cue, same streams, same position:
+
+| C_t | n | queried target | non-queried targets | replaced (queried) | queried label | other tracked labels | untracked labels | word floor | label floor |
+|---|---|---|---|---|---|---|---|---|---|
+| 2 | 30 | 0.767 | 0.000 | 0.400 | 0.653 | 0.000 | 0.000 | 0.050 | 0.000 |
+| 3 | 30 | 0.733 | 0.000 | 0.317 | 0.543 | 0.000 | 0.000 | 0.029 | 0.000 |
+| 4 | 30 | 0.767 | 0.000 | 0.367 | 0.460 | 0.000 | 0.000 | 0.058 | 0.000 |
+| 5 | 30 | 0.667 | 0.000 | 0.500 | 0.608 | 0.000 | 0.000 | 0.067 | 0.000 |
+| 6 | 30 | 0.767 | 0.000 | 0.317 | 0.431 | 0.000 | 0.000 | 0.042 | 0.000 |
+
+Outcome: **B, partial** — about 1 target per stream, flat-to-falling in `C_t`, while list accuracy falls 37% → 0%; t1 is preferred only at `C_t ≥ 4` (t1 ≈ t2 at `C_t = 2–3`), so C is not excluded.
+
+### 7b. retro_cue (Experiment 2b): the cue switches
+
+| position | C_t | n | target A | target B | label A | label B | replaced A | replaced B | other targets | untracked words | word floor | label floor | a1 correct | Q(B) top-1 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 2 | 30 | 0.767 | 0.000 | 0.653 | 0.000 | 0.400 | 0.000 | | 0.006 | 0.050 | 0.000 | 90% | |
+| 1 | 4 | 30 | 0.767 | 0.000 | 0.460 | 0.000 | 0.367 | 0.000 | 0.000 | 0.003 | 0.058 | 0.000 | 93% | |
+| 2 | 2 | 30 | 0.000 | 0.833 | 0.000 | 0.630 | 0.000 | 0.633 | | 0.002 | 0.037 | 0.000 | | 100% |
+| 2 | 4 | 30 | 0.000 | 0.867 | 0.000 | 0.600 | 0.000 | 0.450 | 0.000 | 0.008 | 0.029 | 0.000 | | 97% |
+
+Outcome: **as predicted** — at position 2, B is present at about the single_cue queried rate and A falls to 0.000, below the word floor; no lingering content. Position 1 reproduces single_cue exactly.

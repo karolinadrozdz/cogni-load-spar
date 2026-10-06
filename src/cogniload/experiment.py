@@ -19,6 +19,10 @@ import torch
 
 from cogniload import exemplars, readout, registry, stimuli
 
+#: (rank column, lens) views each experiment's table is printed for.
+VIEWS = [("rank_wordlike", "jlens"), ("rank", "jlens"), ("rank_wordlike", "logit")]
+
+
 def layer_range(n_layers: int, fraction: tuple[float, float]) -> list[int]:
     """Layers in `[lo * n, hi * n)` that the lens fits (it has no final-layer matrix)."""
     lo, hi = fraction
@@ -214,3 +218,7 @@ def presence(df: pd.DataFrame, k: int, *, band_only: bool = True,
     grouped = rows.groupby(ITEM_KEYS, dropna=False)[rank_col].min().reset_index()
     grouped["present"] = grouped[rank_col] <= k
     return grouped
+
+
+def rate(g: pd.DataFrame) -> float:
+    return g["present"].mean() if len(g) else float("nan")

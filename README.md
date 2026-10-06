@@ -83,6 +83,40 @@ a ceiling, flat at ~1 is the deflationary result), `SELECTIVITY`
 (`target_non_queried` against `untracked_final` and `absent`), and `HEADLINE`
 (every group, pooled over `c_t`; compare each to `absent`).
 
+### forced_demand
+
+The same stream, then "List the most recent word for each tracked category, in
+alphabetical order": to emit the first word the model needs every target. Read
+at the `Answer:` prefill.
+
+```bash
+python -m cogniload.cli forced_demand --model dev --limit 5
+python -m cogniload.cli report forced_demand --model dev
+modal run modal_app.py --stage forced_demand --model dev --limit 5
+modal run modal_app.py --stage report --experiment forced_demand --model dev
+```
+
+Read the first table (`rank_wordlike`, J-lens): `targets_mean` (targets present
+per stream), `t1`…`t6` (the target that is alphabetically 1st…6th, the order of
+emission), `replaced`, `label_tracked`, `label_untracked`, against
+`floor_word` and `floor_label`; behaviour in `q1_top1` (first word) and
+`list_correct`. The single_cue table for the same streams follows it.
+
+### retro_cue
+
+Ask for tracked category A, put the model's one-token answer back as an
+assistant turn, then ask for B. Read at both answers (`pos1`, `pos2`).
+
+```bash
+python -m cogniload.cli retro_cue --model dev --limit 5
+python -m cogniload.cli report retro_cue --model dev
+modal run modal_app.py --stage retro_cue --model dev --limit 5
+modal run modal_app.py --stage report --experiment retro_cue --model dev
+```
+
+Read `target_A` and `target_B` at `position` 1 and 2, against `floor_word`:
+does A's word leave when the cue moves to B?
+
 ## Outputs
 
 Under `results/<alias>/`, or the `cogniload-results` Modal volume at
@@ -111,6 +145,8 @@ src/cogniload/
                           scoring, the per-c_t shard loop, loading results
   find_band.py            band discovery
   single_cue.py           single_cue: prompt, run_stream, tables
+  forced_demand.py        forced_demand: same shape
+  retro_cue.py            retro_cue: same shape
   prompts.py              shared templates; chat rendering with the thinking assertion
   readout.py              lens ranks per word, layer and position
   stimuli.py              seeded stream generation (pure)

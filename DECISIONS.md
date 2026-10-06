@@ -1,7 +1,8 @@
 # Decisions
 
 Open choices, each with what was decided, why, and what would reopen it.
-Experiments: `find_band` (band discovery) and `single_cue` (Experiment 1).
+Experiments: `find_band` (band discovery), `single_cue` (Experiment 1),
+`forced_demand` and `retro_cue` (Experiment 2).
 
 ---
 
@@ -261,9 +262,10 @@ scale; any pre-committed number would do, choosing one afterwards would not.
 **Decided:** every readout row logs `rank` (full vocabulary, the paper's
 protocol, primary in `single_cue`) and `rank_wordlike` (ranked among word-like
 tokens only, via the library's own `jlens.vis._meaningful_token_mask`).
-`single_cue` reports both; its capacity and `k` sweeps use `rank`. On
-Qwen3.6-27B `<|im_end|>` and underscore runs flood the full-vocab top-25, so the
-queried target reads 0.29 on `rank` against 0.74 on `rank_wordlike`.
+`single_cue` reports both; its capacity and `k` sweeps use `rank`. The
+forced_demand and retro_cue tables lead with `rank_wordlike`, because on Qwen3.6-27B
+`<|im_end|>` and underscore runs flood the full-vocab top-25 (the queried target
+reads 0.29 on `rank` against 0.74 on `rank_wordlike`).
 
 **Why both:** the library's walkthrough notes that on Qwen "the interesting
 word tokens trail punctuation and single-character tokens in the raw top-K",
@@ -380,6 +382,29 @@ presence is at floor in the task, all three measures return nulls that look
 like findings, and we would only learn that after the full run. The absent-word
 baselines make the check meaningful: they give "present" a chance floor, which
 band-min rank over several layers otherwise lacks.
+
+## D18 — forced_demand: the question, and the instruction before the readout
+
+**Decided:** the question is "List the most recent word for each tracked
+category, in alphabetical order. Answer with the words only, separated by
+commas.", in the same user turn as the stream, prefilled `Answer:`, thinking
+off. The readout sits at the `:` of `Answer:`, so the alphabetical instruction
+comes before it: to emit the first word the model has to compare all `C_t`
+targets. Behaviour is the rank of the alphabetically-first target (sorted
+case-insensitively, since country names are capitalised) at that position;
+`list_correct` is a `split(",")` + `strip()` comparison only. No fallback
+question: first-word top-1 at `C_t = 2` was 33% on prod (40% on the dev smoke),
+above the 20% at which the spec would switch to asking for a category name.
+
+## D19 — retro_cue: cue selection and the three-message render
+
+**Decided:** A = `queried_category`; B = the next tracked category after A in
+`stream.tracked`, wrapping. `a1` is the argmax of the position-1 readout pass's
+own logits (no separate generation). Position 2 is rendered as
+`[user: stream + Q(A), assistant: "Answer: {a1}", user: Q(B)]` through
+`render_chat(..., prefill="Answer:")` (`retro_cue.build_second_cue`). The Qwen3
+template renders the historical assistant turn as plain text with no think
+block; only the final generation prompt carries the empty think block.
 
 ## D20 — The lens is pinned to a commit
 

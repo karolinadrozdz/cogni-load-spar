@@ -2,6 +2,8 @@
 
     python -m cogniload.cli find_band
     python -m cogniload.cli single_cue [--limit N] [--force] [--model dev|prod]
+    python -m cogniload.cli forced_demand
+    python -m cogniload.cli retro_cue
     python -m cogniload.cli report <experiment>
 
 A stage skips any C_t whose shard already exists unless --force. `report`
@@ -19,7 +21,7 @@ import yaml
 
 from cogniload import registry
 
-EXPERIMENTS = ["single_cue"]
+EXPERIMENTS = ["single_cue", "forced_demand", "retro_cue"]
 
 
 def main(argv: list[str] | None = None) -> int:
