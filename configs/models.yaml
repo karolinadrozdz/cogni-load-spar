@@ -1,30 +1,21 @@
-# Model registry — the ONLY place in this repo where a model or lens is named.
+# Model registry: the only place in this repo that names a model or a lens.
 #
-# Add a model: add an alias block. Nothing else in the codebase changes.
-# Switch models: change `model:` in configs/exp1.yaml.
+# Add a model: add an alias block. Use it: `--model <alias>`, or `model:` in
+# configs/experiments.yaml. Every ref is a commit sha; registry.resolve()
+# refuses anything else.
 #
-# Everything model-specific hangs off the alias — weights, lens, chat contract,
-# exemplar list (tokenizer-dependent, so never shared). Refs are pinned to
-# shas; registry.resolve() refuses unpinned refs.
-#
-# This file is hand-written and NEVER machine-rewritten: a YAML round-trip
-# drops every comment below, including the mandatory note on enable_thinking.
-# The workspace band is discovered by Phase 0 R1 and lives in
-# results/<alias>/band.json — see src/cogniload/bands.py.
+# Hand-written, never machine-rewritten: a YAML round-trip drops these comments.
+# The band is discovered by find_band and lives in results/<alias>/band.json.
 
 defaults:
   dtype: bfloat16
-  lens:
-    repo: neuronpedia/jacobian-lens
-    revision: qwen-n1000
-    repo_sha: 16a01f309fcec900fdcec3f4cd5b64f3d00e4d5a  # verified 2026-10-03
-    corpus: Salesforce-wikitext
+  lens_repo: neuronpedia/jacobian-lens
+  lens_revision: 16a01f309fcec900fdcec3f4cd5b64f3d00e4d5a
 
 aliases:
 
-  # Fast-iteration tier. Same lens repo/revision/corpus, model family, tokenizer
-  # and chat template as `prod` — size is the only difference, so a dev result
-  # that breaks in prod implicates scale, not provenance.
+  # dev and prod share the lens repo, model family, tokenizer and chat
+  # template, so a result that holds on dev and breaks on prod implicates scale.
   dev:
     hf_id: Qwen/Qwen3.5-4B
     hf_revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
@@ -32,7 +23,7 @@ aliases:
     d_model: 2560
     lens_file: qwen3.5-4b/jlens/Salesforce-wikitext/Qwen3.5-4B_jacobian_lens_n1000.pt
     # MANDATORY. The Qwen3 template's `else` branch opens `<think>\n`, so an
-    # unset flag means thinking is ON and C2 silently becomes C1.
+    # unset flag means thinking is on and the model writes its state out.
     enable_thinking: false
 
   prod:
@@ -42,9 +33,3 @@ aliases:
     d_model: 5120
     lens_file: qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt
     enable_thinking: false
-    notes: >
-      Qwen3_5ForConditionalGeneration (multimodal wrapper, hybrid linear/full
-      attention). jlens resolves it via Layout("model.language_model"); load with
-      AutoModelForCausalLM as in the jlens walkthrough. The upstream lens dir's
-      config.yaml describes openai/gpt-oss-20b and is a stale export artifact —
-      the .pt is verified correct by shape (DECISIONS.md D5).

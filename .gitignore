@@ -5,9 +5,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-# Generated artifacts. Exemplar lists and manifests are small and reproducible;
-# keep them out of git so a tokenizer change can't produce a silent merge.
-data/exemplars/
+# Run outputs live on the results volume, not in git.
 results/
 *.pt
 .DS_Store

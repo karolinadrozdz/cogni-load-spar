@@ -5,7 +5,8 @@ Status: `dev` (Qwen3.5-4B) floor data collected and analysed. `prod`
 results arrive**, so that the interpretation table below commits us in advance
 rather than letting us rationalise whatever comes back.
 
-Everything numeric here is from the keep-track run at `n = 20` streams per
+Everything numeric here is from the single_cue run (Experiment 1, the keep-track
+task) at `n = 20` streams per
 `C_t` (100 streams total), in-band, `k = 25`, unless stated. Design decisions
 are recorded in `DECISIONS.md` (D1–D17); the measurement choices that matter
 for reading these numbers are D1, D12 and D15.

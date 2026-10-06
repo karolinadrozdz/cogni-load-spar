@@ -1,29 +1,18 @@
-"""Category exemplar pools, filtered to single tokens per model.
-
-The usable set is tokenizer-dependent, so it is built and cached per alias and
-never shared. Pools are oversized; `build()` keeps the first `n_per_category`
-that survive filtering.
-"""
+"""Category exemplar pools, filtered to single tokens for the model's tokenizer."""
 
 from __future__ import annotations
 
-import hashlib
-import json
-from pathlib import Path
 from typing import Any
 
-CACHE_DIR = Path(__file__).resolve().parents[2] / "data" / "exemplars"
-
-#: Order matters: filtering keeps a prefix, so append rather than insert if you
-#: want older runs to stay reproducible.
+#: Filtering keeps a prefix of each pool, so append rather than insert, or
+#: earlier runs stop being reproducible.
 #:
 #: A word must belong to exactly one of these categories, or its role in a
 #: stream is undefined. That rules out in-pool collisions ("orange", "olive")
-#: and also words whose other sense is a category here but absent from its pool
-#: — "organ", "bat", "date", "kiwi", "coral", "bass", "horn". These are
-#: excluded on purpose, including past position 12, since which words a pool
-#: reaches is tokenizer-dependent. `_assert_disjoint` covers only the first
-#: case.
+#: and words whose other sense is a category here but absent from its pool:
+#: "organ", "bat", "date", "kiwi", "coral", "bass", "horn". They stay out even
+#: past position 12, since how far into a pool filtering reaches depends on the
+#: tokenizer. `_assert_disjoint` covers only the first case.
 POOLS: dict[str, list[str]] = {
     "animal": ["cat", "dog", "horse", "bear", "wolf", "fox", "deer", "sheep", "goat",
                "mouse", "frog", "duck", "rabbit", "tiger", "lion", "snake", "eagle",
@@ -52,15 +41,9 @@ POOLS: dict[str, list[str]] = {
                    "fiddle", "lute", "sitar", "gong", "chime"],
 }
 
-
-#: Category labels to read out alongside the exemplars. The Neuronpedia slice
-#: for these prompts is dominated by category vocabulary -- `animals`, `colors`,
-#: `categories` at counts 300-670 -- while the actual remembered words sit at
-#: 60-110. So the task's category structure is what the J-space appears to
-#: carry, and it is measurable with the tracked/untracked contrast D6 already
-#: built into every stream.
-#:
-#: "body part" is absent: it is two words, so it has no single token to read.
+#: Category labels, read alongside the exemplars: Neuronpedia shows category
+#: words dominating the J-space for these prompts. "body part" is two tokens,
+#: so it has no label.
 CATEGORY_LABELS: dict[str, list[str]] = {
     "animal": ["animal", "animals"],
     "fruit": ["fruit", "fruits"],
@@ -71,67 +54,28 @@ CATEGORY_LABELS: dict[str, list[str]] = {
     "instrument": ["instrument", "instruments"],
 }
 
-#: Category names that never appear in a stream: the floor for label presence,
-#: the same role absent words play for exemplars.
+#: Category names that never appear in a stream: the floor for label presence.
 ABSENT_LABELS: list[str] = ["flower", "metal", "sport", "building",
                             "flowers", "metals", "sports", "buildings"]
 
 
-def is_single_token(tokenizer: Any, word: str) -> bool:
-    """True if `word` is one token in the form it appears in a stream.
-
-    Tested space-prefixed, since many tokenizers split a bare word but not its
-    space-prefixed form.
-    """
-    return len(tokenizer.encode(f" {word}", add_special_tokens=False)) == 1
-
-
-def pools_sha() -> str:
-    """Content hash of POOLS; stored in the cache so an edit forces a rebuild."""
-    payload = json.dumps(POOLS, sort_keys=True)
-    return hashlib.sha256(payload.encode()).hexdigest()[:12]
-
-
-def build(
-    tokenizer: Any, alias: str, *, n_per_category: int = 12, force: bool = False
-) -> dict[str, list[str]]:
-    """Filter POOLS to single-token exemplars for one model.
-
-    Cached at `data/exemplars/{alias}.json`, keyed on the alias plus a hash of
-    POOLS and `n_per_category`, so editing a pool cannot leave a stale cache in
-    place for anyone who forgets `--force`.
-    """
-    cache = CACHE_DIR / f"{alias}.json"
-    key = {"pools_sha": pools_sha(), "n_per_category": n_per_category}
-    if cache.exists() and not force:
-        cached = json.loads(cache.read_text())
-        if all(cached.get(k) == v for k, v in key.items()):
-            return cached["exemplars"]
-
+def build(tokenizer: Any, n_per_category: int) -> dict[str, list[str]]:
+    """The first `n_per_category` words of each pool that are one token after a space."""
     out: dict[str, list[str]] = {}
     for category, pool in POOLS.items():
-        kept = [
-            w for w in pool
-            # No exemplar may equal any category name.
-            if w.lower() not in POOLS and w.lower() != category
-            and is_single_token(tokenizer, w)
-        ]
+        kept = [w for w in pool
+                # No exemplar may equal any category name.
+                if w.lower() not in POOLS and w.lower() != category
+                and len(tokenizer.encode(f" {w}", add_special_tokens=False)) == 1]
         if len(kept) < n_per_category:
-            raise ValueError(
-                f"{alias}: category {category!r} has only {len(kept)} single-token "
-                f"exemplars, need {n_per_category}. Extend POOLS[{category!r}]."
-            )
+            raise ValueError(f"category {category!r} has only {len(kept)} single-token "
+                             f"exemplars, need {n_per_category}; extend POOLS[{category!r}]")
         out[category] = kept[:n_per_category]
-
     _assert_disjoint(out)
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps({**key, "alias": alias, "exemplars": out}, indent=2,
-                                sort_keys=True))
     return out
 
 
 def _assert_disjoint(exemplars: dict[str, list[str]]) -> None:
-    """No word may belong to two categories."""
     seen: dict[str, str] = {}
     for category, words in exemplars.items():
         for w in words:

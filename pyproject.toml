@@ -1,7 +1,7 @@
 [project]
 name = "cogniload"
 version = "0.1.0"
-description = "SPAR Experiment 1 — working-memory updating in the J-space"
+description = "SPAR: is the J-space a proxy for the task state a model maintains?"
 requires-python = ">=3.11"
 # Core: enough to generate stimuli, read results, and run the tests. Everything
 # needed to *load a model* is in the `gpu` extra, so a laptop does not pull it.
@@ -10,14 +10,11 @@ dependencies = [
     "pyyaml>=6",
     "pandas>=2.2",
     "pyarrow>=17",
-    "numpy>=1.26",
-    "scipy>=1.14",
 ]
 
 [project.optional-dependencies]
-# On the GPU. jlens is pinned for the same reason the model registry refuses
-# unpinned refs: it is an unmaintained reference implementation, so `main`
-# moving would change the readout without changing our code.
+# On the GPU. jlens is pinned like the models: it is an unmaintained reference
+# implementation, so `main` moving would change the readout under us.
 gpu = [
     "jlens @ git+https://github.com/anthropics/jacobian-lens@581d398613e5602a5af361e1c34d3a92ea82ba8e",
     # jlens itself requires >=5.5, and the Qwen3.5/3.6 model cards need current
@@ -40,6 +37,5 @@ line-length = 90
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Stimulus, registry and prompt tests are pure, so they run without the GPU
-# dependency stack installed.
+# Tests are pure, so they run without the GPU dependency stack.
 pythonpath = ["src"]

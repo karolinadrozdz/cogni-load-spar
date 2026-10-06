@@ -1,0 +1,34 @@
+# Every experiment's settings. `model` is a registry alias (configs/models.yaml);
+# override it per run with --model.
+model: dev
+seed: 0
+out_dir: results
+
+find_band:
+  # Fixed before find_band runs, and judged on its readouts only, so the band
+  # cannot be chosen by what makes an experiment come out well.
+  candidate_fraction: [0.25, 0.85]   # search this depth range
+  k_band: 25                         # legible = median full-vocab rank <= k
+  min_width: 3                       # shortest acceptable band, in layers
+
+# Shared by every experiment, so rows join across experiments on (stream_id, c_t).
+stream:
+  # Every category appears this often, tracked or not, so stream length and
+  # category frequency are the same at every C_t; only the instruction varies.
+  updates_per_tracked: 3
+  tail_guard: 3                      # no target in the last N positions
+  # Only 13 instrument words are single Qwen tokens, and the model must
+  # recognise category membership, so pool quality beats pool size.
+  n_exemplars_per_category: 10
+  n_absent_words: 8                  # same-category words not in the stream: the floor
+
+readout:
+  primary_k: 25                      # present = band-min rank <= k
+  k_values: [1, 5, 10, 25, 50]       # swept, so a result is not an artefact of k
+  # Recorded around the band, to show whether presence peaks outside it.
+  record_layer_fraction: [0.25, 0.85]
+
+single_cue:
+  c_ts: [2, 3, 4, 5, 6]              # five levels, so a saturating curve is testable
+  n_streams: 30
+  list_max_new_tokens: 320           # 64 cuts the list off after 1-2 categories
