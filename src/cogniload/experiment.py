@@ -72,15 +72,15 @@ def words_and_meta(stream: stimuli.Stream, pool: dict, n_absent: int) -> dict[st
     return meta
 
 
-def read_both(ctx: SimpleNamespace, text: str, meta: dict[str, dict],
-              positions: dict[int, str]) -> tuple[list[dict], torch.Tensor]:
+def read_both(ctx: SimpleNamespace, text: str, meta: dict[str, dict], positions: dict[int, str],
+              token_ids: list[int] | None = None) -> tuple[list[dict], torch.Tensor]:
     """J-lens and logit-lens readout of every word in `meta` at `positions` (token -> name).
 
     Returns the rows, each carrying its word's metadata, and the model's own
     logits at `positions` from the J-lens pass.
     """
     words = list(meta)
-    ids = [readout.token_id(ctx.model.tokenizer, w) for w in words]
+    ids = token_ids or [readout.token_id(ctx.model.tokenizer, w) for w in words]
     rows, model_logits = [], None
     for lens_name, jacobian in (("jlens", True), ("logit", False)):
         result, logits = readout.read(ctx.model, ctx.lens, text, words, ids, layers=ctx.layers,

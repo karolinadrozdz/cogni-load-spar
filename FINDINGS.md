@@ -355,3 +355,38 @@ Outcome: **B, partial** — about 1 target per stream, flat-to-falling in `C_t`,
 | 2 | 4 | 30 | 0.000 | 0.867 | 0.000 | 0.600 | 0.000 | 0.450 | 0.000 | 0.008 | 0.029 | 0.000 | | 97% |
 
 Outcome: **as predicted** — at position 2, B is present at about the single_cue queried rate and A falls to 0.000, below the word floor; no lingering content. Position 1 reproduces single_cue exactly.
+
+---
+
+## 8. Derived state (Experiment 3, `prod`, Qwen3.6-27B): derived vs copyable running counts
+
+Spec: `specs/derived-state.md`. Same streams as single_cue and forced_demand, truncated at
+p ∈ [8, 21]; 150 streams per arm. `rank_wordlike`, J-lens, in-band band-min,
+`k = 25`. A value is present if its digit or number word is. `floor 4`: 4 is
+never a count but is in range (matched floor); `floor 5–9`: the spec's floor.
+In-stream "just" = the category of the word ending at that comma; "other" = the
+remaining tracked categories. Logit-lens column = in-stream tracked counts
+under the logit lens. First generated token was a bare digit in 300/300
+streams (D21).
+
+### `derived` arm (counts never written down)
+
+| C_t | n | top-1 | ans: queried | ans: other tracked | ans: untracked | ans: stale | ans: floor 4 | ans: floor 5–9 | in: tracked (just / other) | in: untracked | in: stale | in: floor 4 | in: floor 5–9 | logit-lens in: tracked | collision rate | in-stream positions |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 30 | 90% | 1.000 | 0.933 | 0.857 | 0.894 | 1.000 | 0.620 | 0.002 (0.009 / 0.001) | 0.000 | 0.000 | 0.000 | 0.000 | 0.036 | 0.398 | 425 |
+| 3 | 30 | 97% | 1.000 | 0.950 | 0.836 | 0.857 | 1.000 | 0.653 | 0.000 (0.000 / 0.000) | 0.000 | 0.000 | 0.000 | 0.000 | 0.030 | 0.802 | 389 |
+| 4 | 30 | 87% | 1.000 | 0.933 | 0.864 | 0.836 | 1.000 | 0.533 | 0.001 (0.005 / 0.000) | 0.003 | 0.000 | 0.000 | 0.000 | 0.032 | 0.987 | 365 |
+| 5 | 30 | 100% | 1.000 | 0.950 | 0.714 | 0.746 | 1.000 | 0.593 | 0.002 (0.014 / 0.001) | 0.000 | 0.000 | 0.002 | 0.001 | 0.051 | 1.000 | 419 |
+| 6 | 30 | 97% | 1.000 | 0.953 | 0.680 | 0.850 | 1.000 | 0.667 | 0.004 (0.014 / 0.002) | 0.000 | 0.000 | 0.007 | 0.002 | 0.032 | 1.000 | 432 |
+
+### `copyable` arm (every tracked count written after its word)
+
+| C_t | n | top-1 | ans: queried | ans: other tracked | ans: untracked | ans: stale | ans: floor 4 | ans: floor 5–9 | in: tracked (just / other) | in: untracked | in: stale | in: floor 4 | in: floor 5–9 | logit-lens in: tracked | collision rate | in-stream positions |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | 30 | 100% | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.000 (0.000 / 0.000) | 0.000 | 0.000 | 0.000 | 0.002 | 0.034 | 0.398 | 425 |
+| 3 | 30 | 97% | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.993 | 0.000 (0.000 / 0.000) | 0.000 | 0.000 | 0.000 | 0.004 | 0.016 | 0.802 | 389 |
+| 4 | 30 | 100% | 1.000 | 1.000 | 1.000 | 1.000 | 0.967 | 0.967 | 0.000 (0.000 / 0.000) | 0.000 | 0.000 | 0.000 | 0.010 | 0.021 | 0.987 | 365 |
+| 5 | 30 | 100% | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.000 (0.000 / 0.000) | 0.000 | 0.000 | 0.005 | 0.021 | 0.031 | 1.000 | 419 |
+| 6 | 30 | 100% | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.993 | 0.000 (0.003 / 0.000) | 0.000 | 0.000 | 0.005 | 0.023 | 0.030 | 1.000 | 432 |
+
+Outcome: **C at the answer position** — the matched floor (4) is present at 1.000 in both arms, at or above tracked counts, so the answer-position count readout is digit-ness, not item-specific. **In-stream: uninformative** — tracked counts are at floor in both arms, but so is the copyable arm's just-written digit one token earlier (0.000), so the readout fails its own positive control there; this is not outcome B. Not D: derived accuracy is 87–100% at every `C_t`.

@@ -117,6 +117,30 @@ modal run modal_app.py --stage report --experiment retro_cue --model dev
 Read `target_A` and `target_B` at `position` 1 and 2, against `floor_word`:
 does A's word leave when the cue moves to B?
 
+### derived_state
+
+The stream cut at a seeded point, then "How many {category} words have appeared
+so far?". Arm `derived` shows the plain stream, so the counts exist only in the
+model; arm `copyable` writes each tracked word's running count after it. Read at
+every in-stream comma and at the answer, for the digits 0–9 and the words
+zero–nine.
+
+```bash
+python -m cogniload.cli derived_state --arm derived --model dev --limit 5
+python -m cogniload.cli derived_state --arm copyable --model dev --limit 5
+python -m cogniload.cli report derived_state --model dev
+modal run modal_app.py --stage derived_state --arm derived --model dev --limit 5
+modal run modal_app.py --stage derived_state --arm copyable --model dev --limit 5
+modal run modal_app.py --stage report --experiment derived_state --model dev
+```
+
+One table per arm. `ans_*` columns are at the answer position, `in_*` pooled
+over in-stream commas: `ans_queried`, `ans_tracked`, `in_tracked` (split into
+`in_tracked_just`, the word just read, and `in_tracked_other`), `*_untracked`,
+`*_stale` (the superseded count). Compare them to `*_floor4` (4 is in range but
+never a count) and `*_floor` (5–9). Behaviour is `top1`; `collision_rate` is
+how often two tracked counts share a value.
+
 ## Outputs
 
 Under `results/<alias>/`, or the `cogniload-results` Modal volume at
@@ -128,6 +152,8 @@ Under `results/<alias>/`, or the `cogniload-results` Modal volume at
 | `<experiment>_ct{c}[_limit].parquet` | one row per word × layer × position × lens: `rank`, `rank_wordlike`, `role`, `readout_at`, `in_band` |
 | `<experiment>_summary_ct{c}[_limit].parquet` | one row per stream: behaviour and read positions |
 | `<experiment>_manifest.json` | model spec, prompt templates, exemplars, config |
+
+derived_state names carry the arm: `derived_state_copyable_ct2.parquet`.
 
 Presence is band-min rank ≤ `readout.primary_k` (25). `rank` is over the full
 vocabulary; `rank_wordlike` over word-like tokens only, which is what
@@ -147,6 +173,7 @@ src/cogniload/
   single_cue.py           single_cue: prompt, run_stream, tables
   forced_demand.py        forced_demand: same shape
   retro_cue.py            retro_cue: same shape
+  derived_state.py        derived_state: same shape, plus the arm
   prompts.py              shared templates; chat rendering with the thinking assertion
   readout.py              lens ranks per word, layer and position
   stimuli.py              seeded stream generation (pure)

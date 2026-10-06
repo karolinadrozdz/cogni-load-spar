@@ -2,7 +2,7 @@
 
 Open choices, each with what was decided, why, and what would reopen it.
 Experiments: `find_band` (band discovery), `single_cue` (Experiment 1),
-`forced_demand` and `retro_cue` (Experiment 2).
+`forced_demand` and `retro_cue` (Experiment 2), `derived_state` (Experiment 3).
 
 ---
 
@@ -263,7 +263,7 @@ scale; any pre-committed number would do, choosing one afterwards would not.
 protocol, primary in `single_cue`) and `rank_wordlike` (ranked among word-like
 tokens only, via the library's own `jlens.vis._meaningful_token_mask`).
 `single_cue` reports both; its capacity and `k` sweeps use `rank`. The
-forced_demand and retro_cue tables lead with `rank_wordlike`, because on Qwen3.6-27B
+forced_demand, retro_cue and derived_state tables lead with `rank_wordlike`, because on Qwen3.6-27B
 `<|im_end|>` and underscore runs flood the full-vocab top-25 (the queried target
 reads 0.29 on `rank` against 0.74 on `rank_wordlike`).
 
@@ -412,3 +412,40 @@ block; only the final generation prompt carries the empty think block.
 `JacobianLens.from_pretrained` as `revision=`; `registry.resolve` refuses a
 non-sha. A branch such as `qwen-n1000` would follow its head, so the lens could
 change under a fixed config (D3, D14).
+
+## D21 — derived_state: digit answer prefill and scoring
+
+**Decided:** prefill `"Answer: "` with the trailing space,
+since `" 3"` is two tokens on this tokenizer (`" "` + `"3"`). The answer is
+scored on the bare digit id at the last prompt token, from the readout pass's
+own logits: rank, top-1, and rank among the ids for 0–3. `score_q1` is not
+used: it encodes `" {expected}"`, which is two tokens for a digit. Two tokens
+are greedy-generated and stored raw (`gen_tok1`, `gen_tok2`). On the dev smoke
+the first generated token was a bare digit in 50/50 streams (both arms),
+followed by `<|im_end|>`, so the spec's alternative (prefill `"Answer:"`, score
+the second generated token) is not implemented. Readout tokens: bare digits
+`0`–`9` and the space-prefixed number
+words ` zero`–` nine`, each asserted to be one token; a value is present if its
+digit or its word has band-min rank ≤ 25.
+
+## D22 — derived_state: truncation and count collisions
+
+**Decided:** streams are `experiment.streams` (the shared seeds), truncated to
+`words[:p]` with
+`p = random.Random(f"exp3-{stream_id}-{c_t}").randint(8, 21)` (inclusive;
+`derived_state.trunc_range` in the config). Counts are over the truncated stream (0–3; the queried
+answer can be 0). Groups are scored per category, not per token. An untracked
+category's count is scored only where its value is not also some tracked
+category's current count. A stale value (c − 1 for a tracked count c ≥ 1) is
+skipped when it equals a tracked category's current count, and the number
+skipped is reported. The table also reports the collision rate: positions
+where two or more tracked categories share a count. Floor: values 5–9.
+
+## D23 — derived_state: copyable-arm annotation
+
+**Decided:** the copyable arm writes each **tracked** word as
+`word (category n)`, with the category string as in `stream.tracked` and `n`
+that category's running count including this word. Untracked words are not
+annotated. The derived arm is the plain stream. Readout positions are the
+comma token after items 1..p−1, located by character offsets. `),` may be a
+single token, so the assertion is only that the read token contains `,`.

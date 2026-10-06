@@ -2,6 +2,7 @@
 
     modal run modal_app.py --stage find_band --model dev
     modal run modal_app.py --stage single_cue --model dev --limit 20
+    modal run modal_app.py --stage derived_state --arm copyable --model prod
     modal run modal_app.py --stage report --experiment single_cue --model prod
 
 Run from the repo root: the image picks up `src/` and `configs/` from there.
@@ -57,10 +58,11 @@ def run_stage(args: list[str]) -> str:
 
 
 @app.local_entrypoint()
-def main(stage: str = "find_band", experiment: str = "", model: str = "dev", limit: int = 0,
-         force: bool = False, gpu: str = ""):
+def main(stage: str = "find_band", experiment: str = "", arm: str = "", model: str = "dev",
+         limit: int = 0, force: bool = False, gpu: str = ""):
     args = [stage, *([experiment] if experiment else []), "--model", model,
-            *(["--limit", str(limit)] if limit else []), *(["--force"] if force else [])]
+            *(["--arm", arm] if arm else []), *(["--limit", str(limit)] if limit else []),
+            *(["--force"] if force else [])]
     # GPU follows the alias; `report` reads parquet only.
     fn = run_stage if stage == "report" else run_stage.with_options(
         gpu=gpu or GPU_FOR_ALIAS.get(model, "H100"))

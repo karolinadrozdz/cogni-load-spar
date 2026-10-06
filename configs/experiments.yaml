@@ -41,3 +41,8 @@ forced_demand:
 retro_cue:
   c_ts: [2, 4]
   n_streams: 30
+
+derived_state:
+  c_ts: [2, 3, 4, 5, 6]
+  n_streams: 30
+  trunc_range: [8, 21]               # stream cut at p in this range, so counts vary 0-3

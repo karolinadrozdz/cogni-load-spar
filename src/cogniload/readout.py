@@ -13,11 +13,11 @@ from typing import Any
 import torch
 
 
-def token_id(tokenizer: Any, word: str) -> int:
-    """Id of `word` as it appears in a stream, after ", "."""
-    ids = tokenizer.encode(f" {word}", add_special_tokens=False)
+def token_id(tokenizer: Any, word: str, prefix: str = " ") -> int:
+    """Id of `word` as it appears after ", ". Qwen digits have no spaced form; use prefix=""."""
+    ids = tokenizer.encode(prefix + word, add_special_tokens=False)
     if len(ids) != 1:
-        raise ValueError(f"{word!r} is {len(ids)} tokens, not 1")
+        raise ValueError(f"{prefix + word!r} is {len(ids)} tokens, not 1")
     return ids[0]
 
 
