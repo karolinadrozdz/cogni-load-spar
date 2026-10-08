@@ -248,3 +248,16 @@ answered with a name separates held uncertainty from output staging.
 two conditions differ in form as well as in knowledge. The control words are
 common nouns, not frequency-matched to the uncertainty words. The invented
 names were not searched against real or fictional places.
+
+## D25 — confidence: an early layer window beside the band
+
+**Decided:** the report gives every table twice: in the band, and over
+`confidence.early_fraction: [0.25, 0.60]` of depth (layers 8-18 on `dev`),
+followed by a per-layer profile. Each table also reports, per word group, how
+often one of its words is in the model's own top-k next tokens (`out_*`).
+
+**Why:** the `dev` band is layers 23-26 of 32, where the logit lens reads
+nearly what the J-lens does and a word can be present only as a runner-up for
+the output. The early window is the range before the queried word became
+readable in the keep-track runs (absent through L18). It was fixed after a
+10-item smoke run seen in-band only, and before the full run.

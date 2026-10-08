@@ -61,7 +61,13 @@ Read the first table (`rank_wordlike`, J-lens), one row per condition and
 output type (`correct`, `guess`, `abstain`): `uncertain` and `nonexistent`
 against `control`. The row that matters is `fictitious` / `guess`, where the
 model names a capital and so no uncertainty word is about to be output.
-`answer` is the capital itself, for real items.
+`answer` is the capital itself, for real items. `out_*` is the share of items
+where a word of that group is in the model's own top-k next tokens; where it
+matches the lens columns, the lens is showing runners-up for the output.
+
+The same tables follow for an earlier layer window
+(`confidence.early_fraction`), where the answer is not yet readable, and then
+a per-layer profile for each lens.
 
 Outputs, under `results/<alias>/`: `confidence.parquet` (one row per word ×
 layer × lens), `confidence_summary.parquet` (one row per item: the model's

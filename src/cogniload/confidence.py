@@ -95,7 +95,13 @@ def run_item(ctx: SimpleNamespace, item: dict, word_meta: dict[str, dict]) -> tu
     decoded = [tok.decode([i]) for i in top.indices.tolist()]
     generated = experiment.free_text(ctx.model, text,
                                      max_new_tokens=ctx.config["confidence"]["max_new_tokens"])
+    # Each group's best rank in the model's own next-token distribution: a word
+    # that is a runner-up for the output is not held apart from it.
+    ids = torch.tensor([readout.token_id(tok, w) for w in word_meta])
+    out_rank = pd.Series(readout.rank_of(logits[None], ids)[0].tolist()).groupby(
+        [m["group"] for m in word_meta.values()]).min()
     summary = {
+        **{f"output_rank_{g}": int(r) for g, r in out_rank.items()},
         **item, "answer_pos": last, "top1": decoded[0],
         "top5": " | ".join(f"{t}:{v:.2f}" for t, v in zip(decoded, top.values.tolist())),
         # Rank of the capital in the model's own next-token distribution.
@@ -148,33 +154,56 @@ def run(spec: dict, config: dict, results_dir: Path, *, limit: int | None = None
 
 
 def table(df: pd.DataFrame, summary: pd.DataFrame, k: int, *, rank_col: str = "rank_wordlike",
-          lens: str = "jlens") -> pd.DataFrame:
+          lens: str = "jlens", layers: tuple[int, int] | None = None) -> pd.DataFrame:
     """Per condition and output type: the share of each group's concepts present.
 
-    A concept is present if any of its forms has band-min rank <= k.
+    A concept is present if any of its forms has a minimum rank <= k over the
+    band, or over the half-open layer range `layers` when that is given.
     `uncertain_any` is the share of items with at least one uncertainty concept
-    present. Read every column against `control`.
+    present. Read every column against `control`. `out_*` is the share of items
+    where a word of that group is in the model's own top-k next tokens: where
+    it matches the lens columns, the lens is showing runners-up for the output.
     """
-    rows = df[df["in_band"] & (df["lens"] == lens)]
+    window = df["in_band"] if layers is None else df["layer"].between(layers[0], layers[1] - 1)
+    rows = df[window & (df["lens"] == lens)]
     present = (rows.groupby(["id", "group", "concept"])[rank_col].min() <= k).rename("present")
     per_item = present.groupby(["id", "group"]).mean().unstack("group")
     per_item["uncertain_any"] = present.xs("uncertain", level="group").groupby("id").any()
-    merged = summary.set_index("id")[["condition", "output_type"]].join(per_item)
+    summary = summary.set_index("id")
+    for group in GROUPS:
+        per_item[f"out_{group}"] = summary[f"output_rank_{group}"] <= k
+    merged = summary[["condition", "output_type"]].join(per_item)
     out = merged.groupby(["condition", "output_type"]).mean(numeric_only=True)
     out.insert(0, "n", merged.groupby(["condition", "output_type"]).size())
     return out.reset_index()
 
 
+def by_layer(df: pd.DataFrame, summary: pd.DataFrame, k: int, *, rank_col: str = "rank_wordlike",
+             lens: str = "jlens") -> pd.DataFrame:
+    """Per layer: the share of each group's concepts present, by condition."""
+    rows = df[df["lens"] == lens].merge(summary[["id", "condition"]], on="id")
+    present = rows.groupby(["layer", "condition", "id", "group", "concept"])[rank_col].min() <= k
+    return present.groupby(["layer", "condition", "group"]).mean().unstack(["condition", "group"])
+
+
 def report(spec: dict, config: dict, results_dir: Path) -> None:
     k, fmt = config["readout"]["primary_k"], dict(index=False, float_format="%.3f")
+    lo, hi = config["confidence"]["early_fraction"]
+    early = (int(lo * spec["n_layers"]), int(hi * spec["n_layers"]))
+    windows = (("in-band", None), (f"early layers {early[0]}-{early[1] - 1}", early))
     for limit, label in ((True, "SMOKE (--limit)"), (False, "FULL")):
         shard, summary_path = _paths(spec["alias"], results_dir, limit)
         if not shard.exists():
             continue
         df, summary = pd.read_parquet(shard), pd.read_parquet(summary_path)
-        for rank_col, lens in VIEWS:
-            print(f"\nconfidence {label} [{rank_col}, {lens}, in-band, k={k}]")
-            print(table(df, summary, k, rank_col=rank_col, lens=lens).to_string(**fmt))
+        for name, layers in windows:
+            for rank_col, lens in VIEWS:
+                print(f"\nconfidence {label} [{rank_col}, {lens}, {name}, k={k}]")
+                print(table(df, summary, k, rank_col=rank_col, lens=lens,
+                            layers=layers).to_string(**fmt))
+        for lens in ("jlens", "logit"):
+            print(f"\nconfidence {label} per layer [rank_wordlike, {lens}, k={k}]")
+            print(by_layer(df, summary, k, lens=lens).to_string(float_format="%.3f"))
         print(f"\nconfidence {label} example outputs:")
         for _, r in summary.groupby("condition").head(5).iterrows():
             print(f"  {r.condition:<10} {r.entity:<13} -> {r.generated!r} ({r.output_type})")

@@ -61,4 +61,23 @@ def test_runner_and_table_on_a_fake_model(ctx):
 
     t = confidence.table(df, summary, K)
     assert t.n.sum() == len(items) and set(t.condition) == {"real", "fictitious"}
-    assert {"uncertain", "nonexistent", "control", "answer", "uncertain_any"} <= set(t.columns)
+    assert {"uncertain", "nonexistent", "control", "answer", "uncertain_any",
+            "out_uncertain", "out_nonexistent", "out_control"} <= set(t.columns)
+    # A layer window outside the band, and the per-layer profile.
+    assert confidence.table(df, summary, K, layers=(10, 11)).n.sum() == len(items)
+    profile = confidence.by_layer(df, summary, K)
+    assert list(profile.index) == ctx.layers
+    assert ("fictitious", "uncertain") in profile.columns and ("real", "answer") in profile.columns
+
+
+def test_report_prints_both_windows_and_the_layer_profile(ctx, tmp_path, capsys):
+    items = confidence.load_items(STIMULI)
+    word_meta = confidence.words(ctx.model.tokenizer)
+    out = [confidence.run_item(ctx, i, word_meta) for i in items[:2] + items[50:52]]
+    shard, summary_path = confidence._paths("dev", tmp_path, False)
+    shard.parent.mkdir(parents=True)
+    pd.DataFrame([r for rows, _ in out for r in rows]).to_parquet(shard, index=False)
+    pd.DataFrame([s for _, s in out]).to_parquet(summary_path, index=False)
+    confidence.report(ctx.spec, CONFIG, tmp_path)
+    printed = capsys.readouterr().out
+    assert "in-band" in printed and "early layers 8-18" in printed and "per layer" in printed

@@ -20,3 +20,6 @@ readout:
 confidence:
   stimuli: stimuli/capitals.csv      # written by stimuli/capitals.py
   max_new_tokens: 8                  # enough to tell a named capital from a refusal
+  # A second window, before the answer is readable: on dev the queried word of
+  # the keep-track runs is absent through L18 of 32. Fixed before the full run.
+  early_fraction: [0.25, 0.60]
