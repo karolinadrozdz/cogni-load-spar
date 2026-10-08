@@ -147,12 +147,14 @@ def free_text(model: Any, prompt: str, *, max_new_tokens: int) -> str:
 
 def run(prefix: str, settings: dict, run_stream: Callable, templates: dict, spec: dict,
         config: dict, results_dir: Path, *, limit: int | None = None, force: bool = False,
-        show: Callable | None = None) -> None:
+        show: Callable | None = None, cells: Callable | None = None) -> None:
     """Run `run_stream` on each stream at each C_t, writing one shard per C_t and a manifest.
 
     Writes `<prefix>_ct{c}[_limit].parquet` (readout rows) and
     `<prefix>_summary_ct{c}[_limit].parquet` (one row per stream). An existing
-    shard is skipped unless `force`, so a crashed sweep resumes.
+    shard is skipped unless `force`, so a crashed sweep resumes. `cells(ctx, n)`
+    replaces the C_t streams for an experiment without them: it yields
+    `(key, tag, items)`, one shard `<prefix>_{tag}` each, and `show` gets `key`.
     """
     layers = recorded_layers(spec, config)
     out = Path(results_dir) / spec["alias"]
@@ -166,43 +168,46 @@ def run(prefix: str, settings: dict, run_stream: Callable, templates: dict, spec
     print(f"{prefix}: layers {layers[0]}-{layers[-1]}, band {spec['band']}; "
           f"{n_streams} streams per C_t")
 
-    for c_t in settings["c_ts"]:
-        shard = out / f"{prefix}_ct{c_t}{suffix}.parquet"
+    if cells is None:
+        cells = lambda ctx, n: ((c_t, f"ct{c_t}", streams(pool, config, c_t, n))
+                                for c_t in settings["c_ts"])
+    for key, tag, items in cells(ctx, n_streams):
+        shard = out / f"{prefix}_{tag}{suffix}.parquet"
         if shard.exists() and not force:
-            print(f"  C_t={c_t}: {shard.name} exists, skipping")
+            print(f"  {shard.name} exists, skipping")
             continue
         rows, summaries = [], []
-        for stream in streams(pool, config, c_t, n_streams):
+        for stream in items:
             stream_rows, summary = run_stream(ctx, stream)
             rows += stream_rows
             summaries.append(summary)
         pd.DataFrame(rows).to_parquet(shard, index=False)
         summary = pd.DataFrame(summaries)
-        summary.to_parquet(out / f"{prefix}_summary_ct{c_t}{suffix}.parquet", index=False)
+        summary.to_parquet(out / f"{prefix}_summary_{tag}{suffix}.parquet", index=False)
         if show:
-            show(c_t, summary)
+            show(key, summary)
 
     (out / f"{prefix}_manifest.json").write_text(json.dumps(
         {"spec": spec, "templates": templates, "exemplars": pool, "config": config}, indent=2))
 
 
 def load(prefix: str, alias: str, results_dir: Path, *, limit: bool = False,
-         kind: str = "") -> pd.DataFrame:
+         kind: str = "", cell: str = "ct") -> pd.DataFrame:
     """One experiment's shards concatenated; `kind="_summary"` for the per-stream rows."""
     out = Path(results_dir) / alias
-    pattern = f"{prefix}{kind}_ct*{'_limit' if limit else ''}.parquet"
+    pattern = f"{prefix}{kind}_{cell}*{'_limit' if limit else ''}.parquet"
     paths = [p for p in sorted(out.glob(pattern)) if limit or not p.name.endswith("_limit.parquet")]
     if not paths:
         raise FileNotFoundError(f"no {pattern} in {out}")
     return pd.concat(map(pd.read_parquet, paths), ignore_index=True)
 
 
-def runs(prefix: str, alias: str, results_dir: Path):
+def runs(prefix: str, alias: str, results_dir: Path, cell: str = "ct"):
     """Yield `(label, rows, summary)` for the `--limit` run and the full run, where present."""
     for limit, label in ((True, "SMOKE (--limit)"), (False, "FULL")):
         try:
-            yield (label, load(prefix, alias, results_dir, limit=limit),
-                   load(prefix, alias, results_dir, limit=limit, kind="_summary"))
+            yield (label, load(prefix, alias, results_dir, limit=limit, cell=cell),
+                   load(prefix, alias, results_dir, limit=limit, kind="_summary", cell=cell))
         except FileNotFoundError:
             continue
 
@@ -212,10 +217,10 @@ ITEM_KEYS = ["lens", "readout_at", "stream_id", "c_t", "word", "role", "category
 
 
 def presence(df: pd.DataFrame, k: int, *, band_only: bool = True,
-             rank_col: str = "rank") -> pd.DataFrame:
+             rank_col: str = "rank", keys: list[str] = ITEM_KEYS) -> pd.DataFrame:
     """One row per (lens, position, item): band-min rank, and whether it is <= k."""
     rows = df[df["in_band"]] if band_only else df
-    grouped = rows.groupby(ITEM_KEYS, dropna=False)[rank_col].min().reset_index()
+    grouped = rows.groupby(keys, dropna=False)[rank_col].min().reset_index()
     grouped["present"] = grouped[rank_col] <= k
     return grouped
 

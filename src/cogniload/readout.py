@@ -67,3 +67,41 @@ def read(model: Any, lens: Any, prompt: str, words: Sequence[str], token_ids: Se
                   "rank": int(rank[pi, i]), "rank_wordlike": int(rank_w[pi, i])}
                  for i, w in enumerate(words) for pi, p in enumerate(positions)]
     return rows, model_logits.cpu()
+
+
+def _lens_at(model: Any, lens: Any, prompt: str, layers: Sequence[int], position: int,
+             use_jacobian: bool) -> tuple[dict[int, torch.Tensor], torch.Tensor, torch.Tensor]:
+    """Lens logits per layer and the model's own logits at one position, and the word-like
+    mask `rank_wordlike` counts among."""
+    from jlens.vis import _meaningful_token_mask
+
+    lens_logits, model_logits, _ = lens.apply(
+        model, prompt, layers=list(layers), positions=[position], use_jacobian=use_jacobian)
+    first = lens_logits[min(lens_logits)]
+    wordlike = _meaningful_token_mask(model.tokenizer, first.shape[-1], first.device)
+    return {l: x[0] for l, x in lens_logits.items()}, model_logits[0], wordlike
+
+
+def top_tokens(model: Any, lens: Any, prompt: str, *, layers: Sequence[int], position: int,
+               n: int, use_jacobian: bool = True) -> tuple[dict[int, list[str]], torch.Tensor]:
+    """The top `n` word-like tokens, decoded, at `position` for each layer, and the model's
+    own logits there."""
+    lens_logits, model_logits, wordlike = _lens_at(model, lens, prompt, layers, position,
+                                                   use_jacobian)
+    top = {layer: logits.masked_fill(~wordlike, float("-inf")).topk(n).indices.tolist()
+           for layer, logits in sorted(lens_logits.items())}
+    return ({layer: [model.tokenizer.decode([i]) for i in ids] for layer, ids in top.items()},
+            model_logits)
+
+
+def band_top_tokens(model: Any, lens: Any, prompt: str, *, layers: Sequence[int],
+                    position: int, n: int, use_jacobian: bool = True) -> list[tuple[str, int]]:
+    """The `n` tokens with the best word-like rank at `position` over `layers` (band-min),
+    decoded, with that rank."""
+    lens_logits, _, wordlike = _lens_at(model, lens, prompt, layers, position, use_jacobian)
+    best = None
+    for logits in lens_logits.values():
+        rank = logits.masked_fill(~wordlike, float("-inf")).argsort(descending=True).argsort() + 1
+        best = rank if best is None else torch.minimum(best, rank)
+    ids = best.topk(n, largest=False).indices.tolist()
+    return [(model.tokenizer.decode([i]), int(best[i])) for i in ids]

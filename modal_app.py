@@ -59,10 +59,11 @@ def run_stage(args: list[str]) -> str:
 
 @app.local_entrypoint()
 def main(stage: str = "find_band", experiment: str = "", arm: str = "", model: str = "dev",
-         limit: int = 0, force: bool = False, gpu: str = ""):
+         limit: int = 0, force: bool = False, gpu: str = "", top_tokens: int = 0):
     args = [stage, *([experiment] if experiment else []), "--model", model,
             *(["--arm", arm] if arm else []), *(["--limit", str(limit)] if limit else []),
-            *(["--force"] if force else [])]
+            *(["--force"] if force else []),
+            *(["--top-tokens", str(top_tokens)] if top_tokens else [])]
     # GPU follows the alias; `report` reads parquet only.
     fn = run_stage if stage == "report" else run_stage.with_options(
         gpu=gpu or GPU_FOR_ALIAS.get(model, "H100"))

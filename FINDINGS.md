@@ -390,3 +390,176 @@ streams (D21).
 | 6 | 30 | 100% | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.993 | 0.000 (0.003 / 0.000) | 0.000 | 0.000 | 0.005 | 0.023 | 0.030 | 1.000 | 432 |
 
 Outcome: **C at the answer position** — the matched floor (4) is present at 1.000 in both arms, at or above tracked counts, so the answer-position count readout is digit-ness, not item-specific. **In-stream: uninformative** — tracked counts are at floor in both arms, but so is the copyable arm's just-written digit one token earlier (0.000), so the readout fails its own positive control there; this is not outcome B. Not D: derived accuracy is 87–100% at every `C_t`.
+
+---
+
+## 9. state_tracking (`prod`, Qwen3.6-27B)
+
+Spec: `specs/state-tracking.md`; follow-up plan `plan-2026-10-07.md`.
+Derived arm, 14 cells × 30 items, thinking off, question ending "Answer in
+one word.", prefill `Answer:`. `k` = updates on the queried person's (PoI)
+chain; `h` = updates to the other two people (hays). `pre_hays` / `tail_hays`
+= hays before / after the PoI's last needle. Behaviour from the readout pass's
+logits at the answer position. ±17 points per cell at n = 30.
+
+### Derived top-1
+
+| | h = 1 | h = k | h = 2k |
+|---|---|---|---|
+| k = 1 | 100% | — | 93% |
+| k = 2 | 47% | 67% | 53% |
+| k = 3 | 70% | 40% | 33% |
+| k = 4 | 67% | 33% | 10% |
+| k = 5 | 77% | 53% | 17% |
+
+Matches: against H-depth (a five-hop chain is at 77% at h = 1); does not separate the others.
+
+### A1. Recency split
+
+Top-1 by whether the last update is a needle (n = 15 per half):
+
+| k | h | top-1 | needle last | hay last |
+|---|---|---|---|---|
+| 1 | 1 | 1.000 | 1.000 | 1.000 |
+| 1 | 2 | 0.933 | 1.000 | 0.867 |
+| 2 | 1 | 0.467 | 0.800 | 0.133 |
+| 2 | 2 | 0.667 | 0.867 | 0.467 |
+| 2 | 4 | 0.533 | 0.800 | 0.267 |
+| 3 | 1 | 0.700 | 0.867 | 0.533 |
+| 3 | 3 | 0.400 | 0.800 | 0.000 |
+| 3 | 6 | 0.333 | 0.600 | 0.067 |
+| 4 | 1 | 0.667 | 0.867 | 0.467 |
+| 4 | 4 | 0.333 | 0.400 | 0.267 |
+| 4 | 8 | 0.100 | 0.200 | 0.000 |
+| 5 | 1 | 0.767 | 0.733 | 0.800 |
+| 5 | 5 | 0.533 | 0.933 | 0.133 |
+| 5 | 10 | 0.167 | 0.333 | 0.000 |
+
+Matches: H-recency — needle-last beats hay-last in 12 of 14 cells.
+
+Logistic regression, `correct ~ k + pre_hays + tail_hays`, pooled (n = 420):
+
+| term | coef | se | z | LR p |
+|---|---|---|---|---|
+| intercept | 2.953 | 0.369 | 8.01 | 2.7e-20 |
+| k | −0.274 | 0.098 | −2.81 | 0.0047 |
+| pre_hays | −0.301 | 0.053 | −5.70 | 1e-09 |
+| tail_hays | −1.665 | 0.210 | −7.94 | 1.5e-25 |
+
+Matches: mainly H-recency (a tail hay costs ~5× a pre hay); `pre_hays` and `k` are also non-zero, so H-interference / H-depth are not excluded. `k`, `pre_hays` and `tail_hays` are correlated in this design; hay_factorial decorrelates them.
+
+Top-1 (n) by `tail_hays`:
+
+| k | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| 1 | 1.00 (30) | 0.96 (23) | 0.86 (7) | | | |
+| 2 | 0.82 (45) | 0.32 (31) | 0.20 (10) | 0.00 (2) | 0.50 (2) | |
+| 3 | 0.76 (45) | 0.29 (31) | 0.00 (6) | 0.00 (4) | 0.00 (1) | 0.00 (3) |
+| 4 | 0.49 (45) | 0.34 (29) | 0.09 (11) | 0.00 (3) | 0.00 (1) | 0.00 (1) |
+| 5 | 0.67 (45) | 0.44 (32) | 0.00 (6) | 0.00 (3) | 0.00 (3) | 0.00 (1) |
+
+Matches: H-recency — at every k ≥ 2 the first tail hay costs 15–50 points.
+
+### A2. Error classes (emitted token)
+
+Per `k` (share of items):
+
+| k | n | target | PoI stale −1 | −2 | −3 | −4 | other current | out of prompt |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 60 | 0.967 | 0.033 | | | | 0.000 | 0.000 |
+| 2 | 90 | 0.556 | 0.400 | 0.011 | | | 0.022 | 0.011 |
+| 3 | 90 | 0.478 | 0.089 | 0.289 | | | 0.144 | 0.000 |
+| 4 | 90 | 0.367 | 0.022 | 0.100 | 0.344 | | 0.156 | 0.011 |
+| 5 | 90 | 0.489 | 0.022 | 0.011 | 0.089 | 0.222 | 0.167 | 0.000 |
+
+Per `h`:
+
+| h | n | target | PoI stale −1 | −2 | −3 | −4 | other current | out of prompt |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 150 | 0.720 | 0.113 | 0.047 | 0.040 | 0.047 | 0.020 | 0.013 |
+| 2 | 60 | 0.800 | 0.200 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| 3 | 30 | 0.400 | 0.067 | 0.333 | 0.000 | 0.000 | 0.200 | 0.000 |
+| 4 | 60 | 0.433 | 0.200 | 0.067 | 0.183 | 0.000 | 0.117 | 0.000 |
+| 5 | 30 | 0.533 | 0.033 | 0.033 | 0.033 | 0.200 | 0.167 | 0.000 |
+| 6 | 30 | 0.333 | 0.133 | 0.300 | 0.000 | 0.000 | 0.233 | 0.000 |
+| 8 | 30 | 0.100 | 0.033 | 0.200 | 0.467 | 0.000 | 0.200 | 0.000 |
+| 10 | 30 | 0.167 | 0.033 | 0.000 | 0.233 | 0.233 | 0.333 | 0.000 |
+
+Matches: no row. The dominant error at every k ≥ 2 is PoI stale −(k−1), the object from the PoI's *first* swap (one hop from the named initial state), not stale −1 (H-interference / H-depth) nor other-current (H-recency); other-stale never occurs. Other-current rises with h (0.02 → 0.33), consistent with a recency component.
+
+### B. Copyable arm and the readout's positive control
+
+Copyable = the full state written after every update; same items. Target
+presence = J-lens, `rank_wordlike`, in-band (38–54) band-min ≤ 25, answer
+position.
+
+| k | h | top-1 copyable | top-1 derived | copyable target present | floor |
+|---|---|---|---|---|---|
+| 1 | 1 | 1.000 | 1.000 | 0.033 | 0.000 |
+| 1 | 2 | 1.000 | 0.933 | 0.067 | 0.000 |
+| 2 | 1 | 1.000 | 0.467 | 0.000 | 0.000 |
+| 2 | 2 | 1.000 | 0.667 | 0.067 | 0.000 |
+| 2 | 4 | 1.000 | 0.533 | 0.100 | 0.000 |
+| 3 | 1 | 1.000 | 0.700 | 0.133 | 0.000 |
+| 3 | 3 | 1.000 | 0.400 | 0.033 | 0.000 |
+| 3 | 6 | 1.000 | 0.333 | 0.233 | 0.000 |
+| 4 | 1 | 1.000 | 0.667 | 0.033 | 0.000 |
+| 4 | 4 | 1.000 | 0.333 | 0.133 | 0.000 |
+| 4 | 8 | 1.000 | 0.100 | 0.000 | 0.000 |
+| 5 | 1 | 1.000 | 0.767 | 0.067 | 0.000 |
+| 5 | 5 | 1.000 | 0.533 | 0.067 | 0.000 |
+| 5 | 10 | 1.000 | 0.167 | 0.233 | 0.000 |
+
+Median `rank_wordlike` of the target at the answer position, by layer (copyable arm): 13k–110k from layer 16 to 49, 1,198 at layer 52 (logit lens 899). Layers 54–63 are not recorded.
+
+Outcome: **0′ for absence claims** — copyable is at ceiling (the derived deficit is tracking), but the emitted target is present in only 0.086 of copyable items in the band, so "X is absent from the J-space" cannot be claimed at this position. Presence claims do not depend on this control.
+
+### Answer-position contents by arm × correct (J-lens / logit lens, in-band, `rank_wordlike` ≤ 25)
+
+Only groups with any non-zero entry shown; other current, other stale, names and floor are ≤ 0.009 in every row.
+
+| arm | k | correct | n | target | PoI stale −1 | −2 | −3 | −4 | emitted |
+|---|---|---|---|---|---|---|---|---|---|
+| copyable | 1 | ✓ | 60 | 0.050 / 0.033 | 0.000 | | | | 0.050 / 0.033 |
+| copyable | 2 | ✓ | 90 | 0.056 / 0.033 | 0.000 | 0.000 | | | 0.056 / 0.033 |
+| copyable | 3 | ✓ | 90 | 0.133 / 0.111 | 0.000 | 0.000 | 0.000 | | 0.133 / 0.111 |
+| copyable | 4 | ✓ | 90 | 0.056 / 0.022 | 0.000 | 0.000 | 0.000 | 0.000 | 0.056 / 0.022 |
+| copyable | 5 | ✓ | 90 | 0.122 / 0.033 | 0.000 | 0.000 | 0.000 | 0.000 | 0.122 / 0.033 |
+| derived | 1 | ✓ | 58 | 0.241 / 0.190 | 0.000 | | | | 0.241 / 0.190 |
+| derived | 2 | ✗ | 40 | 0.000 / 0.000 | 0.150 / 0.100 | 0.000 | | | 0.154 / 0.103 |
+| derived | 2 | ✓ | 50 | 0.040 / 0.040 | 0.020 / 0.020 | 0.000 | | | 0.040 / 0.040 |
+| derived | 3 | ✗ | 47 | 0.000 / 0.000 | 0.000 | 0.085 / 0.085 | 0.000 | | 0.085 / 0.085 |
+| derived | 3 | ✓ | 43 | 0.047 / 0.116 | 0.000 | 0.000 / 0.023 | 0.000 | | 0.047 / 0.116 |
+| derived | 4 | ✗ | 57 | 0.000 / 0.000 | 0.000 | 0.000 | 0.105 / 0.070 | 0.000 | 0.089 / 0.071 |
+| derived | 4 | ✓ | 33 | 0.000 / 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 / 0.000 |
+| derived | 5 | ✗ | 46 | 0.000 / 0.000 | 0.000 | 0.000 | 0.022 / 0.022 | 0.087 / 0.022 | 0.087 / 0.043 |
+| derived | 5 | ✓ | 44 | 0.000 / 0.023 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 / 0.023 |
+
+Best band rank among all words read (objects, floor, names), median over items: J-lens 285–463 (copyable), 149–217 (derived); logit lens 85–171 (copyable), 121–261 (derived). Share of items with any read word ≤ 25: 0.05–0.23.
+
+Outcome: the only object ever present is the one about to be emitted — the target on correct trials, the emitted wrong object (mostly PoI stale −(k−1)) on wrong trials, at 0.05–0.24 — with the J-lens no better than the logit lens; no other object, name or floor word is present in any row. The band at this position holds few object words of any kind (best read word ranked in the hundreds). 
+Top-10 band tokens at the answer position (`k = 3, h = 3`, 5 items per arm, layers 37–52, word-like mask):
+
+| | J-lens | logit lens |
+|---|---|---|
+| copyable | answer-format and meta words: `Answer` / `答案` / `ANSW`, `Final`, `Last`, `Unknown`, `Nothing`, `None`, `Question`, digits at L49; an object only once (` Bowl`, L52) | sub-word fragments and CJK (`ult`, `av`, `盈`, `ább`); no objects |
+| derived | operation and absence words: `替换` / `交换` / `Replace` / `Exchange` / `swapped` (L43), `Final` / `最终` / `Last`, then `Unknown` / `None` / `Nothing` / `Empty` / `Remaining` (L46–52); capitalised objects at L52 in 2 of 5 items (` Bag`, ` Drum`, ` Cup`) | — |
+
+The model's own top 5 is the target plus its capitalised form; in the derived arm also other chain objects (e.g. ` bag`, ` bowl`, ` drum` for target `bowl`).
+
+Outcome: the band at the answer position holds task-level concepts (the swap operation, "final", "unknown/none"), not objects — the item-level/category-level pattern of single_cue, one level up. Measurement caveat: only the lower-case ` object` form is read; capitalised forms appear in the band (` Bowl`, ` Bag`, ` Drum`, ` Cup`) and are not counted, so object presence above is a lower bound.
+
+### Period ending the last update (J-lens / logit lens, in-band, `rank_wordlike` ≤ 25)
+
+`just new` = the last update's new object, the token immediately before this period (adjacency control); excluded from every other column. `PoI current` is empty when the last update is a needle (it is then `just new`).
+
+| arm | last is needle | correct | n | just new | PoI current | other current | stale | names (PoI / other) | floor |
+|---|---|---|---|---|---|---|---|---|---|
+| copyable | no | ✓ | 210 | 0.000 / 0.010 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.003 |
+| copyable | yes | ✓ | 210 | 0.000 / 0.029 | — | 0.000 / 0.005 | 0.001 / 0.010 | 0.000 / 0.000 | 0.000 / 0.012 |
+| derived | no | ✗ | 135 | 0.067 / 0.030 | 0.000 / 0.007 | 0.000 / 0.000 | 0.001 / 0.009 | 0.000 / 0.000 | 0.001 / 0.008 |
+| derived | no | ✓ | 75 | 0.013 / 0.013 | 0.000 / 0.000 | 0.000 / 0.013 | 0.000 / 0.003 | 0.000 / 0.000 | 0.000 / 0.005 |
+| derived | yes | ✗ | 57 | 0.035 / 0.053 | — | 0.000 / 0.009 | 0.004 / 0.019 | 0.000 / 0.000 | 0.005 / 0.013 |
+| derived | yes | ✓ | 153 | 0.026 / 0.020 | — | 0.000 / 0.007 | 0.004 / 0.018 | 0.000 / 0.000 | 0.004 / 0.018 |
+
+Outcome: every group is at floor in both arms and both lenses, including the object written one token earlier (≤ 0.067); as in derived_state, the in-stream readout fails its own positive control, so no state claim is possible at this position. Pending: the top-25 band tokens here, by category.

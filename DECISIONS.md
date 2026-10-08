@@ -2,7 +2,8 @@
 
 Open choices, each with what was decided, why, and what would reopen it.
 Experiments: `find_band` (band discovery), `single_cue` (Experiment 1),
-`forced_demand` and `retro_cue` (Experiment 2), `derived_state` (Experiment 3).
+`forced_demand` and `retro_cue` (Experiment 2), `derived_state` (Experiment 3),
+`state_tracking` (spec: `specs/state-tracking.md`).
 
 ---
 
@@ -449,3 +450,125 @@ that category's running count including this word. Untracked words are not
 annotated. The derived arm is the plain stream. Readout positions are the
 comma token after items 1..p−1, located by character offsets. `),` may be a
 single token, so the assertion is only that the read token contains `,`.
+
+## D24 — state_tracking: item grammar, pools and grid
+
+**Why:** each update names its person by the object they hold now, so the
+final state cannot be read off the page without applying every update in
+order; with thinking off, that chain is a load on one forward pass. Names and
+objects must each be one token, so every readout and the emitted answer are
+scored on a single id.
+
+**Decided:** `n = 3` people. Initial sentence `"{name} holds the {obj}."`,
+update `"The person holding the {cond} swaps it for the {new}."`, question
+`"What is {poi} holding?"` in the same user turn, sentences joined by single
+spaces, rendered through `render_chat` with thinking off. Pools are the
+spec's candidates, kept if `readout.token_id` finds one token with a leading
+space in the run's tokenizer, then dropping any object inside another;
+asserted ≥ 6 names and ≥ 21 objects, and the surviving lists go in the
+manifest (`templates.names`, `templates.objects`). Grid: `k ∈ {1..5}`,
+`h ∈ {1, k, 2k}`. At `k = 1` that set is `{1, 2}`, so the duplicate cell is
+dropped: 14 cells × 30 = 420 items per arm, not the spec's 450. Items are
+seeded per cell (`random.Random(f"state_tracking-{k}-{h}")`), independent of
+arm, so both arms see the same items and `--limit N` takes the first N of
+each cell. One shard per cell: `state_tracking_<arm>_k{k}_h{h}[_limit].parquet`.
+
+## D25 — state_tracking: no reused object, recency guard, floor
+
+**Why:** a reused object would make a readout token ambiguous between roles.
+If every item ended in a needle, "answer = the last new object" would score
+without any tracking. A floor drawn from the same pool is matched to the
+targets in frequency and form.
+
+**Decided:** each item samples `3 + k + h` distinct objects: 3 for the initial
+state, one fresh `new` per update. Items alternate: even-indexed items end in a
+hay (`last_is_needle = False`), odd-indexed end in a needle, so each full cell
+is 15/15 (with `--limit` the split is approximate). Needle positions are a
+uniform sample of the slots allowed by that constraint; each hay's person is a
+uniform non-PoI. Every item passes `state_tracking.validate`. The floor is
+every pool object not used in the item (≥ 3), never in the prompt.
+
+## D26 — state_tracking: prefill and first-token behaviour
+
+**Why:** behaviour is scored on one token, so the token after the prefill has
+to be the bare object. An article there would score every item wrong for a
+format reason.
+
+**Decided:** prefill is `state_tracking.prefill` in the config, default
+`"Answer:"`; switching to `"Answer: the"` is a config change only. Behaviour is
+the readout pass's own logits at the last prompt token: argmax, `score_q1`
+against the target, restricted rank among the item's in-prompt objects, and an
+error class from the decoded argmax (`target`, `poi_stale_j`,
+`other_current`, `other_stale`, `out_of_prompt`). No generation. The decoded
+argmax is printed per cell and in `report`. The question ends "Answer in one
+word.", as single_cue's does: without it the argmax at `Answer:` is ` **` in
+every item, with the target behind it. With it, the first token is a bare pool
+object in every dev smoke item (70/70, derived arm), so the prefill stays
+`"Answer:"`.
+
+## D27 — state_tracking: copyable-arm annotation
+
+**Why:** the copyable arm is the ceiling and the readout's positive control,
+which needs every binding on the page at every step. Annotating only needles
+would leave the hays' bindings to be derived.
+
+**Decided:** every update, needle and hay, gets ` (Ann: pen, Ben: lamp, Tom:
+cup)` before its period: the full state after that update, names in
+initial-state order. Everything else is identical to the derived arm. The
+readout at each update sits on the token containing the sentence's final
+period, located by character offset (after `)` in this arm).
+
+## D29 — hay_factorial and hay_type: terminal object, pre_hays, tail_hays
+
+**Why:** in state_tracking, `h` grows with `k` and the hays after the PoI's
+last needle are not controlled, so "hays interfere with the lookup" and "the
+model answers a recent object" predict the same curve. Splitting the hays by
+position against the PoI's last needle separates them.
+
+**Decided:** a terminal object is one introduced in the prompt and never later
+used as a condition; there are exactly three per item, one per person.
+`tail_hays` is the number of hays after the PoI's last needle, `pre_hays =
+h − tail_hays`. Both are stored per item (in the item and the summary row).
+The A1 regression is the logistic `correct ~ k + pre_hays + tail_hays`,
+reported with coefficients, Wald z and the likelihood-ratio p for dropping
+each term.
+
+## D30 — hay_factorial: grid, tail_hays strata, pool cap
+
+**Why:** the regression in D29 is only clean if `k`, `pre_hays` and
+`tail_hays` are independent by design, not by the luck of the interleaving.
+`h = 0` is the reference with no hays at all.
+
+**Decided:** derived arm only, `k ∈ {1, 3, 5}` × `h ∈ {0, 2, 4, 8, 12}`, 60
+items per cell, 900 items. Item `i` of a cell has `tail_hays =
+strata[i % len(strata)]`, where the strata are those of `{0, 2, 4}` that are
+≤ `h`: `{0}` at `h = 0`, `{0, 2}` at `h = 2`, else `{0, 2, 4}`, so a full cell
+splits equally (20/20/20 or 30/30; approximate under `--limit`). The PoI's last
+needle sits just before the tail; its other `k − 1` needles are a uniform
+sample of the slots before it, and each hay's person is a uniform non-PoI.
+Items are seeded `random.Random(f"hay_factorial-{k}-{h}")`, apart from
+state_tracking's cells, and every item passes `state_tracking.validate`
+unchanged. Pool cap, checked at run time on the filtered pool: if
+`3 + max k + max h + 3 floor` objects do not fit, every `h` above
+`hay_factorial.h_cap` (10) becomes 10; the manifest records `hs` and
+`h_capped`. One shard per cell: `hay_factorial_k{k}_h{h}[_limit].parquet`.
+
+## D31 — hay_type: hay templates and shared items
+
+**Why:** if the cost of a hay is the lookup among identical "holding the X"
+sentences, a hay that names its person needs no lookup and a reworded hay does
+not match the needle template; each should recover accuracy by a different
+amount. Only the hay sentence may differ between arms, or a difference could
+come from the items.
+
+**Decided:** derived templates, `k = 3`, `h = 6`, `tail_hays = 2`, 60 items,
+seeded `random.Random("hay_type-3-6")` independent of arm, so every arm sees
+the same items. Needles always use the state_tracking update template. Hays:
+`same` is that template, `named` is `"{who} swaps the {cond} for the {new}."`
+(the hay's person by name), `reworded` is `"Whoever has the {cond} trades it
+for the {new}."`. The arm's template rides on the item (`item["hay"]`), which
+`state_tracking.build` reads for hays only, so `run_item`'s readout, period
+offsets and scoring are reused unchanged; without the key `build` is
+byte-identical to before. `same` renders exactly state_tracking's derived
+prompt. The reference for every arm is hay_factorial's `k = 3, h = 0` cell.
+Shards: `hay_type_<arm>_k3_h6[_limit].parquet`.

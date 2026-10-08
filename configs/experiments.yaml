@@ -46,3 +46,23 @@ derived_state:
   c_ts: [2, 3, 4, 5, 6]
   n_streams: 30
   trunc_range: [8, 21]               # stream cut at p in this range, so counts vary 0-3
+
+state_tracking:
+  ks: [1, 2, 3, 4, 5]                # needles = PoI chain length; hays h in {1, k, 2k}
+  n_streams: 30                      # items per (k, h) cell
+  prefill: "Answer:"                 # "Answer: the" if the first token is an article
+
+# Derived arm only; prompts, prefill and scoring are state_tracking's.
+hay_factorial:
+  ks: [1, 3, 5]
+  hs: [0, 2, 4, 8, 12]
+  tail_hays: [0, 2, 4]               # hays after the PoI's last needle, equal strata per cell (those <= h)
+  h_cap: 10                          # if the object pool cannot fit 3 + max k + max h + 3 floor objects
+  n_streams: 60                      # items per (k, h) cell
+
+# Same items in every arm (--arm same|named|reworded); only the hay sentences differ.
+hay_type:
+  k: 3
+  h: 6
+  tail_hays: 2
+  n_streams: 60

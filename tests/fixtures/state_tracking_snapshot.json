@@ -1,0 +1,2012 @@
+{
+ "k1_h1_0": {
+  "item": {
+   "k": 1,
+   "h": 1,
+   "item_id": 0,
+   "names": [
+    "Sam",
+    "Ann",
+    "Dan"
+   ],
+   "poi": "Sam",
+   "chains": {
+    "Sam": [
+     "sock",
+     "pen"
+    ],
+    "Ann": [
+     "map"
+    ],
+    "Dan": [
+     "ring",
+     "box"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "sock",
+     "new": "pen",
+     "state": {
+      "Sam": "pen",
+      "Ann": "map",
+      "Dan": "ring"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": false,
+     "who": "Dan",
+     "cond": "ring",
+     "new": "box",
+     "state": {
+      "Sam": "pen",
+      "Ann": "map",
+      "Dan": "box"
+     }
+    }
+   ],
+   "last_is_needle": false,
+   "floor": [
+    "key",
+    "lamp",
+    "cup",
+    "coin",
+    "bell",
+    "bag",
+    "fan",
+    "jar",
+    "rope",
+    "drum",
+    "comb",
+    "nail",
+    "clip",
+    "book",
+    "hat",
+    "fork",
+    "bowl",
+    "vase",
+    "flag",
+    "kite",
+    "rock",
+    "shell",
+    "stick",
+    "brush",
+    "chain"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nSam holds the sock. Ann holds the map. Dan holds the ring. The person holding the sock swaps it for the pen. The person holding the ring swaps it for the box. What is Sam holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    124,
+    174
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nSam holds the sock. Ann holds the map. Dan holds the ring. The person holding the sock swaps it for the pen (Sam: pen, Ann: map, Dan: ring). The person holding the ring swaps it for the box (Sam: pen, Ann: map, Dan: box). What is Sam holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    156,
+    237
+   ]
+  ]
+ },
+ "k1_h1_1": {
+  "item": {
+   "k": 1,
+   "h": 1,
+   "item_id": 1,
+   "names": [
+    "Joe",
+    "Amy",
+    "Eve"
+   ],
+   "poi": "Eve",
+   "chains": {
+    "Joe": [
+     "flag"
+    ],
+    "Amy": [
+     "pen",
+     "lamp"
+    ],
+    "Eve": [
+     "cup",
+     "book"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": false,
+     "who": "Amy",
+     "cond": "pen",
+     "new": "lamp",
+     "state": {
+      "Joe": "flag",
+      "Amy": "lamp",
+      "Eve": "cup"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": true,
+     "who": "Eve",
+     "cond": "cup",
+     "new": "book",
+     "state": {
+      "Joe": "flag",
+      "Amy": "lamp",
+      "Eve": "book"
+     }
+    }
+   ],
+   "last_is_needle": true,
+   "floor": [
+    "key",
+    "map",
+    "coin",
+    "bell",
+    "ring",
+    "box",
+    "bag",
+    "fan",
+    "jar",
+    "rope",
+    "drum",
+    "comb",
+    "nail",
+    "clip",
+    "hat",
+    "sock",
+    "fork",
+    "bowl",
+    "vase",
+    "kite",
+    "rock",
+    "shell",
+    "stick",
+    "brush",
+    "chain"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nJoe holds the flag. Amy holds the pen. Eve holds the cup. The person holding the pen swaps it for the lamp. The person holding the cup swaps it for the book. What is Eve holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    123,
+    173
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nJoe holds the flag. Amy holds the pen. Eve holds the cup. The person holding the pen swaps it for the lamp (Joe: flag, Amy: lamp, Eve: cup). The person holding the cup swaps it for the book (Joe: flag, Amy: lamp, Eve: book). What is Eve holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    156,
+    240
+   ]
+  ]
+ },
+ "k1_h1_2": {
+  "item": {
+   "k": 1,
+   "h": 1,
+   "item_id": 2,
+   "names": [
+    "Joe",
+    "Ann",
+    "Tom"
+   ],
+   "poi": "Tom",
+   "chains": {
+    "Joe": [
+     "rope"
+    ],
+    "Ann": [
+     "clip",
+     "brush"
+    ],
+    "Tom": [
+     "coin",
+     "fan"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": true,
+     "who": "Tom",
+     "cond": "coin",
+     "new": "fan",
+     "state": {
+      "Joe": "rope",
+      "Ann": "clip",
+      "Tom": "fan"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": false,
+     "who": "Ann",
+     "cond": "clip",
+     "new": "brush",
+     "state": {
+      "Joe": "rope",
+      "Ann": "brush",
+      "Tom": "fan"
+     }
+    }
+   ],
+   "last_is_needle": false,
+   "floor": [
+    "key",
+    "lamp",
+    "cup",
+    "pen",
+    "map",
+    "bell",
+    "ring",
+    "box",
+    "bag",
+    "jar",
+    "drum",
+    "comb",
+    "nail",
+    "book",
+    "hat",
+    "sock",
+    "fork",
+    "bowl",
+    "vase",
+    "flag",
+    "kite",
+    "rock",
+    "shell",
+    "stick",
+    "chain"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nJoe holds the rope. Ann holds the clip. Tom holds the coin. The person holding the coin swaps it for the fan. The person holding the clip swaps it for the brush. What is Tom holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    125,
+    177
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nJoe holds the rope. Ann holds the clip. Tom holds the coin. The person holding the coin swaps it for the fan (Joe: rope, Ann: clip, Tom: fan). The person holding the clip swaps it for the brush (Joe: rope, Ann: brush, Tom: fan). What is Tom holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    158,
+    244
+   ]
+  ]
+ },
+ "k2_h1_0": {
+  "item": {
+   "k": 2,
+   "h": 1,
+   "item_id": 0,
+   "names": [
+    "Tom",
+    "Ben",
+    "Dan"
+   ],
+   "poi": "Ben",
+   "chains": {
+    "Tom": [
+     "ring"
+    ],
+    "Ben": [
+     "bell",
+     "brush",
+     "clip"
+    ],
+    "Dan": [
+     "jar",
+     "hat"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": true,
+     "who": "Ben",
+     "cond": "bell",
+     "new": "brush",
+     "state": {
+      "Tom": "ring",
+      "Ben": "brush",
+      "Dan": "jar"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": true,
+     "who": "Ben",
+     "cond": "brush",
+     "new": "clip",
+     "state": {
+      "Tom": "ring",
+      "Ben": "clip",
+      "Dan": "jar"
+     }
+    },
+    {
+     "step": 2,
+     "is_needle": false,
+     "who": "Dan",
+     "cond": "jar",
+     "new": "hat",
+     "state": {
+      "Tom": "ring",
+      "Ben": "clip",
+      "Dan": "hat"
+     }
+    }
+   ],
+   "last_is_needle": false,
+   "floor": [
+    "key",
+    "lamp",
+    "cup",
+    "pen",
+    "map",
+    "coin",
+    "box",
+    "bag",
+    "fan",
+    "rope",
+    "drum",
+    "comb",
+    "nail",
+    "book",
+    "sock",
+    "fork",
+    "bowl",
+    "vase",
+    "flag",
+    "kite",
+    "rock",
+    "shell",
+    "stick",
+    "chain"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nTom holds the ring. Ben holds the bell. Dan holds the jar. The person holding the bell swaps it for the brush. The person holding the brush swaps it for the clip. The person holding the jar swaps it for the hat. What is Ben holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    126,
+    178,
+    227
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nTom holds the ring. Ben holds the bell. Dan holds the jar. The person holding the bell swaps it for the brush (Tom: ring, Ben: brush, Dan: jar). The person holding the brush swaps it for the clip (Tom: ring, Ben: clip, Dan: jar). The person holding the jar swaps it for the hat (Tom: ring, Ben: clip, Dan: hat). What is Ben holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    160,
+    245,
+    327
+   ]
+  ]
+ },
+ "k2_h1_1": {
+  "item": {
+   "k": 2,
+   "h": 1,
+   "item_id": 1,
+   "names": [
+    "Max",
+    "Dan",
+    "Amy"
+   ],
+   "poi": "Dan",
+   "chains": {
+    "Max": [
+     "coin"
+    ],
+    "Dan": [
+     "jar",
+     "chain",
+     "nail"
+    ],
+    "Amy": [
+     "sock",
+     "brush"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": false,
+     "who": "Amy",
+     "cond": "sock",
+     "new": "brush",
+     "state": {
+      "Max": "coin",
+      "Dan": "jar",
+      "Amy": "brush"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": true,
+     "who": "Dan",
+     "cond": "jar",
+     "new": "chain",
+     "state": {
+      "Max": "coin",
+      "Dan": "chain",
+      "Amy": "brush"
+     }
+    },
+    {
+     "step": 2,
+     "is_needle": true,
+     "who": "Dan",
+     "cond": "chain",
+     "new": "nail",
+     "state": {
+      "Max": "coin",
+      "Dan": "nail",
+      "Amy": "brush"
+     }
+    }
+   ],
+   "last_is_needle": true,
+   "floor": [
+    "key",
+    "lamp",
+    "cup",
+    "pen",
+    "map",
+    "bell",
+    "ring",
+    "box",
+    "bag",
+    "fan",
+    "rope",
+    "drum",
+    "comb",
+    "clip",
+    "book",
+    "hat",
+    "fork",
+    "bowl",
+    "vase",
+    "flag",
+    "kite",
+    "rock",
+    "shell",
+    "stick"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nMax holds the coin. Dan holds the jar. Amy holds the sock. The person holding the sock swaps it for the brush. The person holding the jar swaps it for the chain. The person holding the chain swaps it for the nail. What is Dan holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    126,
+    177,
+    229
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nMax holds the coin. Dan holds the jar. Amy holds the sock. The person holding the sock swaps it for the brush (Max: coin, Dan: jar, Amy: brush). The person holding the jar swaps it for the chain (Max: coin, Dan: chain, Amy: brush). The person holding the chain swaps it for the nail (Max: coin, Dan: nail, Amy: brush). What is Dan holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    160,
+    247,
+    334
+   ]
+  ]
+ },
+ "k2_h1_2": {
+  "item": {
+   "k": 2,
+   "h": 1,
+   "item_id": 2,
+   "names": [
+    "Tom",
+    "Max",
+    "Ben"
+   ],
+   "poi": "Ben",
+   "chains": {
+    "Tom": [
+     "pen",
+     "shell"
+    ],
+    "Max": [
+     "ring"
+    ],
+    "Ben": [
+     "clip",
+     "key",
+     "bell"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": true,
+     "who": "Ben",
+     "cond": "clip",
+     "new": "key",
+     "state": {
+      "Tom": "pen",
+      "Max": "ring",
+      "Ben": "key"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": true,
+     "who": "Ben",
+     "cond": "key",
+     "new": "bell",
+     "state": {
+      "Tom": "pen",
+      "Max": "ring",
+      "Ben": "bell"
+     }
+    },
+    {
+     "step": 2,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "pen",
+     "new": "shell",
+     "state": {
+      "Tom": "shell",
+      "Max": "ring",
+      "Ben": "bell"
+     }
+    }
+   ],
+   "last_is_needle": false,
+   "floor": [
+    "lamp",
+    "cup",
+    "map",
+    "coin",
+    "box",
+    "bag",
+    "fan",
+    "jar",
+    "rope",
+    "drum",
+    "comb",
+    "nail",
+    "book",
+    "hat",
+    "sock",
+    "fork",
+    "bowl",
+    "vase",
+    "flag",
+    "kite",
+    "rock",
+    "stick",
+    "brush",
+    "chain"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nTom holds the pen. Max holds the ring. Ben holds the clip. The person holding the clip swaps it for the key. The person holding the key swaps it for the bell. The person holding the pen swaps it for the shell. What is Ben holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    124,
+    174,
+    225
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nTom holds the pen. Max holds the ring. Ben holds the clip. The person holding the clip swaps it for the key (Tom: pen, Max: ring, Ben: key). The person holding the key swaps it for the bell (Tom: pen, Max: ring, Ben: bell). The person holding the pen swaps it for the shell (Tom: shell, Max: ring, Ben: bell). What is Ben holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    156,
+    239,
+    325
+   ]
+  ]
+ },
+ "k3_h6_0": {
+  "item": {
+   "k": 3,
+   "h": 6,
+   "item_id": 0,
+   "names": [
+    "Amy",
+    "Ben",
+    "Max"
+   ],
+   "poi": "Max",
+   "chains": {
+    "Amy": [
+     "sock",
+     "fork"
+    ],
+    "Ben": [
+     "flag",
+     "bowl",
+     "shell",
+     "coin",
+     "map",
+     "clip"
+    ],
+    "Max": [
+     "rock",
+     "box",
+     "lamp",
+     "vase"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "flag",
+     "new": "bowl",
+     "state": {
+      "Amy": "sock",
+      "Ben": "bowl",
+      "Max": "rock"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "bowl",
+     "new": "shell",
+     "state": {
+      "Amy": "sock",
+      "Ben": "shell",
+      "Max": "rock"
+     }
+    },
+    {
+     "step": 2,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "shell",
+     "new": "coin",
+     "state": {
+      "Amy": "sock",
+      "Ben": "coin",
+      "Max": "rock"
+     }
+    },
+    {
+     "step": 3,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "coin",
+     "new": "map",
+     "state": {
+      "Amy": "sock",
+      "Ben": "map",
+      "Max": "rock"
+     }
+    },
+    {
+     "step": 4,
+     "is_needle": true,
+     "who": "Max",
+     "cond": "rock",
+     "new": "box",
+     "state": {
+      "Amy": "sock",
+      "Ben": "map",
+      "Max": "box"
+     }
+    },
+    {
+     "step": 5,
+     "is_needle": true,
+     "who": "Max",
+     "cond": "box",
+     "new": "lamp",
+     "state": {
+      "Amy": "sock",
+      "Ben": "map",
+      "Max": "lamp"
+     }
+    },
+    {
+     "step": 6,
+     "is_needle": true,
+     "who": "Max",
+     "cond": "lamp",
+     "new": "vase",
+     "state": {
+      "Amy": "sock",
+      "Ben": "map",
+      "Max": "vase"
+     }
+    },
+    {
+     "step": 7,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "map",
+     "new": "clip",
+     "state": {
+      "Amy": "sock",
+      "Ben": "clip",
+      "Max": "vase"
+     }
+    },
+    {
+     "step": 8,
+     "is_needle": false,
+     "who": "Amy",
+     "cond": "sock",
+     "new": "fork",
+     "state": {
+      "Amy": "fork",
+      "Ben": "clip",
+      "Max": "vase"
+     }
+    }
+   ],
+   "last_is_needle": false,
+   "floor": [
+    "key",
+    "cup",
+    "pen",
+    "bell",
+    "ring",
+    "bag",
+    "fan",
+    "jar",
+    "rope",
+    "drum",
+    "comb",
+    "nail",
+    "book",
+    "hat",
+    "kite",
+    "stick",
+    "brush",
+    "chain"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nAmy holds the sock. Ben holds the flag. Max holds the rock. The person holding the flag swaps it for the bowl. The person holding the bowl swaps it for the shell. The person holding the shell swaps it for the coin. The person holding the coin swaps it for the map. The person holding the rock swaps it for the box. The person holding the box swaps it for the lamp. The person holding the lamp swaps it for the vase. The person holding the map swaps it for the clip. The person holding the sock swaps it for the fork. What is Max holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    126,
+    178,
+    230,
+    280,
+    330,
+    380,
+    431,
+    481,
+    532
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nAmy holds the sock. Ben holds the flag. Max holds the rock. The person holding the flag swaps it for the bowl (Amy: sock, Ben: bowl, Max: rock). The person holding the bowl swaps it for the shell (Amy: sock, Ben: shell, Max: rock). The person holding the shell swaps it for the coin (Amy: sock, Ben: coin, Max: rock). The person holding the coin swaps it for the map (Amy: sock, Ben: map, Max: rock). The person holding the rock swaps it for the box (Amy: sock, Ben: map, Max: box). The person holding the box swaps it for the lamp (Amy: sock, Ben: map, Max: lamp). The person holding the lamp swaps it for the vase (Amy: sock, Ben: map, Max: vase). The person holding the map swaps it for the clip (Amy: sock, Ben: clip, Max: vase). The person holding the sock swaps it for the fork (Amy: fork, Ben: clip, Max: vase). What is Max holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    160,
+    247,
+    333,
+    416,
+    498,
+    581,
+    665,
+    749,
+    834
+   ]
+  ]
+ },
+ "k3_h6_1": {
+  "item": {
+   "k": 3,
+   "h": 6,
+   "item_id": 1,
+   "names": [
+    "Tom",
+    "Joe",
+    "Eve"
+   ],
+   "poi": "Tom",
+   "chains": {
+    "Tom": [
+     "shell",
+     "flag",
+     "hat",
+     "drum"
+    ],
+    "Joe": [
+     "brush",
+     "jar",
+     "bag",
+     "rock",
+     "box"
+    ],
+    "Eve": [
+     "book",
+     "bell",
+     "kite"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "brush",
+     "new": "jar",
+     "state": {
+      "Tom": "shell",
+      "Joe": "jar",
+      "Eve": "book"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": true,
+     "who": "Tom",
+     "cond": "shell",
+     "new": "flag",
+     "state": {
+      "Tom": "flag",
+      "Joe": "jar",
+      "Eve": "book"
+     }
+    },
+    {
+     "step": 2,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "jar",
+     "new": "bag",
+     "state": {
+      "Tom": "flag",
+      "Joe": "bag",
+      "Eve": "book"
+     }
+    },
+    {
+     "step": 3,
+     "is_needle": true,
+     "who": "Tom",
+     "cond": "flag",
+     "new": "hat",
+     "state": {
+      "Tom": "hat",
+      "Joe": "bag",
+      "Eve": "book"
+     }
+    },
+    {
+     "step": 4,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "bag",
+     "new": "rock",
+     "state": {
+      "Tom": "hat",
+      "Joe": "rock",
+      "Eve": "book"
+     }
+    },
+    {
+     "step": 5,
+     "is_needle": false,
+     "who": "Eve",
+     "cond": "book",
+     "new": "bell",
+     "state": {
+      "Tom": "hat",
+      "Joe": "rock",
+      "Eve": "bell"
+     }
+    },
+    {
+     "step": 6,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "rock",
+     "new": "box",
+     "state": {
+      "Tom": "hat",
+      "Joe": "box",
+      "Eve": "bell"
+     }
+    },
+    {
+     "step": 7,
+     "is_needle": false,
+     "who": "Eve",
+     "cond": "bell",
+     "new": "kite",
+     "state": {
+      "Tom": "hat",
+      "Joe": "box",
+      "Eve": "kite"
+     }
+    },
+    {
+     "step": 8,
+     "is_needle": true,
+     "who": "Tom",
+     "cond": "hat",
+     "new": "drum",
+     "state": {
+      "Tom": "drum",
+      "Joe": "box",
+      "Eve": "kite"
+     }
+    }
+   ],
+   "last_is_needle": true,
+   "floor": [
+    "key",
+    "lamp",
+    "cup",
+    "pen",
+    "map",
+    "coin",
+    "ring",
+    "fan",
+    "rope",
+    "comb",
+    "nail",
+    "clip",
+    "sock",
+    "fork",
+    "bowl",
+    "vase",
+    "stick",
+    "chain"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nTom holds the shell. Joe holds the brush. Eve holds the book. The person holding the brush swaps it for the jar. The person holding the shell swaps it for the flag. The person holding the jar swaps it for the bag. The person holding the flag swaps it for the hat. The person holding the bag swaps it for the rock. The person holding the book swaps it for the bell. The person holding the rock swaps it for the box. The person holding the bell swaps it for the kite. The person holding the hat swaps it for the drum. What is Tom holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    128,
+    180,
+    229,
+    279,
+    329,
+    380,
+    430,
+    481,
+    531
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nTom holds the shell. Joe holds the brush. Eve holds the book. The person holding the brush swaps it for the jar (Tom: shell, Joe: jar, Eve: book). The person holding the shell swaps it for the flag (Tom: flag, Joe: jar, Eve: book). The person holding the jar swaps it for the bag (Tom: flag, Joe: bag, Eve: book). The person holding the flag swaps it for the hat (Tom: hat, Joe: bag, Eve: book). The person holding the bag swaps it for the rock (Tom: hat, Joe: rock, Eve: book). The person holding the book swaps it for the bell (Tom: hat, Joe: rock, Eve: bell). The person holding the rock swaps it for the box (Tom: hat, Joe: box, Eve: bell). The person holding the bell swaps it for the kite (Tom: hat, Joe: box, Eve: kite). The person holding the hat swaps it for the drum (Tom: drum, Joe: box, Eve: kite). What is Tom holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    162,
+    247,
+    329,
+    411,
+    494,
+    578,
+    660,
+    743,
+    826
+   ]
+  ]
+ },
+ "k3_h6_2": {
+  "item": {
+   "k": 3,
+   "h": 6,
+   "item_id": 2,
+   "names": [
+    "Tom",
+    "Ben",
+    "Ann"
+   ],
+   "poi": "Tom",
+   "chains": {
+    "Tom": [
+     "fan",
+     "rock",
+     "pen",
+     "jar"
+    ],
+    "Ben": [
+     "cup",
+     "fork",
+     "box",
+     "sock"
+    ],
+    "Ann": [
+     "book",
+     "kite",
+     "rope",
+     "flag"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": true,
+     "who": "Tom",
+     "cond": "fan",
+     "new": "rock",
+     "state": {
+      "Tom": "rock",
+      "Ben": "cup",
+      "Ann": "book"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "cup",
+     "new": "fork",
+     "state": {
+      "Tom": "rock",
+      "Ben": "fork",
+      "Ann": "book"
+     }
+    },
+    {
+     "step": 2,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "fork",
+     "new": "box",
+     "state": {
+      "Tom": "rock",
+      "Ben": "box",
+      "Ann": "book"
+     }
+    },
+    {
+     "step": 3,
+     "is_needle": false,
+     "who": "Ann",
+     "cond": "book",
+     "new": "kite",
+     "state": {
+      "Tom": "rock",
+      "Ben": "box",
+      "Ann": "kite"
+     }
+    },
+    {
+     "step": 4,
+     "is_needle": true,
+     "who": "Tom",
+     "cond": "rock",
+     "new": "pen",
+     "state": {
+      "Tom": "pen",
+      "Ben": "box",
+      "Ann": "kite"
+     }
+    },
+    {
+     "step": 5,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "box",
+     "new": "sock",
+     "state": {
+      "Tom": "pen",
+      "Ben": "sock",
+      "Ann": "kite"
+     }
+    },
+    {
+     "step": 6,
+     "is_needle": true,
+     "who": "Tom",
+     "cond": "pen",
+     "new": "jar",
+     "state": {
+      "Tom": "jar",
+      "Ben": "sock",
+      "Ann": "kite"
+     }
+    },
+    {
+     "step": 7,
+     "is_needle": false,
+     "who": "Ann",
+     "cond": "kite",
+     "new": "rope",
+     "state": {
+      "Tom": "jar",
+      "Ben": "sock",
+      "Ann": "rope"
+     }
+    },
+    {
+     "step": 8,
+     "is_needle": false,
+     "who": "Ann",
+     "cond": "rope",
+     "new": "flag",
+     "state": {
+      "Tom": "jar",
+      "Ben": "sock",
+      "Ann": "flag"
+     }
+    }
+   ],
+   "last_is_needle": false,
+   "floor": [
+    "key",
+    "lamp",
+    "map",
+    "coin",
+    "bell",
+    "ring",
+    "bag",
+    "drum",
+    "comb",
+    "nail",
+    "clip",
+    "hat",
+    "bowl",
+    "vase",
+    "shell",
+    "stick",
+    "brush",
+    "chain"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nTom holds the fan. Ben holds the cup. Ann holds the book. The person holding the fan swaps it for the rock. The person holding the cup swaps it for the fork. The person holding the fork swaps it for the box. The person holding the book swaps it for the kite. The person holding the rock swaps it for the pen. The person holding the box swaps it for the sock. The person holding the pen swaps it for the jar. The person holding the kite swaps it for the rope. The person holding the rope swaps it for the flag. What is Tom holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    123,
+    173,
+    223,
+    274,
+    324,
+    374,
+    423,
+    474,
+    525
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nTom holds the fan. Ben holds the cup. Ann holds the book. The person holding the fan swaps it for the rock (Tom: rock, Ben: cup, Ann: book). The person holding the cup swaps it for the fork (Tom: rock, Ben: fork, Ann: book). The person holding the fork swaps it for the box (Tom: rock, Ben: box, Ann: book). The person holding the book swaps it for the kite (Tom: rock, Ben: box, Ann: kite). The person holding the rock swaps it for the pen (Tom: pen, Ben: box, Ann: kite). The person holding the box swaps it for the sock (Tom: pen, Ben: sock, Ann: kite). The person holding the pen swaps it for the jar (Tom: jar, Ben: sock, Ann: kite). The person holding the kite swaps it for the rope (Tom: jar, Ben: sock, Ann: rope). The person holding the rope swaps it for the flag (Tom: jar, Ben: sock, Ann: flag). What is Tom holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    156,
+    240,
+    323,
+    407,
+    489,
+    572,
+    654,
+    738,
+    822
+   ]
+  ]
+ },
+ "k5_h10_0": {
+  "item": {
+   "k": 5,
+   "h": 10,
+   "item_id": 0,
+   "names": [
+    "Joe",
+    "Ann",
+    "Sam"
+   ],
+   "poi": "Sam",
+   "chains": {
+    "Joe": [
+     "cup",
+     "jar",
+     "shell",
+     "brush",
+     "fork",
+     "box",
+     "coin",
+     "rope"
+    ],
+    "Ann": [
+     "nail",
+     "bag",
+     "comb",
+     "clip"
+    ],
+    "Sam": [
+     "fan",
+     "lamp",
+     "kite",
+     "flag",
+     "sock",
+     "rock"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "cup",
+     "new": "jar",
+     "state": {
+      "Joe": "jar",
+      "Ann": "nail",
+      "Sam": "fan"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "fan",
+     "new": "lamp",
+     "state": {
+      "Joe": "jar",
+      "Ann": "nail",
+      "Sam": "lamp"
+     }
+    },
+    {
+     "step": 2,
+     "is_needle": false,
+     "who": "Ann",
+     "cond": "nail",
+     "new": "bag",
+     "state": {
+      "Joe": "jar",
+      "Ann": "bag",
+      "Sam": "lamp"
+     }
+    },
+    {
+     "step": 3,
+     "is_needle": false,
+     "who": "Ann",
+     "cond": "bag",
+     "new": "comb",
+     "state": {
+      "Joe": "jar",
+      "Ann": "comb",
+      "Sam": "lamp"
+     }
+    },
+    {
+     "step": 4,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "jar",
+     "new": "shell",
+     "state": {
+      "Joe": "shell",
+      "Ann": "comb",
+      "Sam": "lamp"
+     }
+    },
+    {
+     "step": 5,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "lamp",
+     "new": "kite",
+     "state": {
+      "Joe": "shell",
+      "Ann": "comb",
+      "Sam": "kite"
+     }
+    },
+    {
+     "step": 6,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "kite",
+     "new": "flag",
+     "state": {
+      "Joe": "shell",
+      "Ann": "comb",
+      "Sam": "flag"
+     }
+    },
+    {
+     "step": 7,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "shell",
+     "new": "brush",
+     "state": {
+      "Joe": "brush",
+      "Ann": "comb",
+      "Sam": "flag"
+     }
+    },
+    {
+     "step": 8,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "brush",
+     "new": "fork",
+     "state": {
+      "Joe": "fork",
+      "Ann": "comb",
+      "Sam": "flag"
+     }
+    },
+    {
+     "step": 9,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "flag",
+     "new": "sock",
+     "state": {
+      "Joe": "fork",
+      "Ann": "comb",
+      "Sam": "sock"
+     }
+    },
+    {
+     "step": 10,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "fork",
+     "new": "box",
+     "state": {
+      "Joe": "box",
+      "Ann": "comb",
+      "Sam": "sock"
+     }
+    },
+    {
+     "step": 11,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "box",
+     "new": "coin",
+     "state": {
+      "Joe": "coin",
+      "Ann": "comb",
+      "Sam": "sock"
+     }
+    },
+    {
+     "step": 12,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "sock",
+     "new": "rock",
+     "state": {
+      "Joe": "coin",
+      "Ann": "comb",
+      "Sam": "rock"
+     }
+    },
+    {
+     "step": 13,
+     "is_needle": false,
+     "who": "Ann",
+     "cond": "comb",
+     "new": "clip",
+     "state": {
+      "Joe": "coin",
+      "Ann": "clip",
+      "Sam": "rock"
+     }
+    },
+    {
+     "step": 14,
+     "is_needle": false,
+     "who": "Joe",
+     "cond": "coin",
+     "new": "rope",
+     "state": {
+      "Joe": "rope",
+      "Ann": "clip",
+      "Sam": "rock"
+     }
+    }
+   ],
+   "last_is_needle": false,
+   "floor": [
+    "key",
+    "pen",
+    "map",
+    "bell",
+    "ring",
+    "drum",
+    "book",
+    "hat",
+    "bowl",
+    "vase",
+    "stick",
+    "chain"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nJoe holds the cup. Ann holds the nail. Sam holds the fan. The person holding the cup swaps it for the jar. The person holding the fan swaps it for the lamp. The person holding the nail swaps it for the bag. The person holding the bag swaps it for the comb. The person holding the jar swaps it for the shell. The person holding the lamp swaps it for the kite. The person holding the kite swaps it for the flag. The person holding the shell swaps it for the brush. The person holding the brush swaps it for the fork. The person holding the flag swaps it for the sock. The person holding the fork swaps it for the box. The person holding the box swaps it for the coin. The person holding the sock swaps it for the rock. The person holding the comb swaps it for the clip. The person holding the coin swaps it for the rope. What is Sam holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    122,
+    172,
+    222,
+    272,
+    323,
+    374,
+    425,
+    478,
+    530,
+    581,
+    631,
+    681,
+    732,
+    783,
+    834
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nJoe holds the cup. Ann holds the nail. Sam holds the fan. The person holding the cup swaps it for the jar (Joe: jar, Ann: nail, Sam: fan). The person holding the fan swaps it for the lamp (Joe: jar, Ann: nail, Sam: lamp). The person holding the nail swaps it for the bag (Joe: jar, Ann: bag, Sam: lamp). The person holding the bag swaps it for the comb (Joe: jar, Ann: comb, Sam: lamp). The person holding the jar swaps it for the shell (Joe: shell, Ann: comb, Sam: lamp). The person holding the lamp swaps it for the kite (Joe: shell, Ann: comb, Sam: kite). The person holding the kite swaps it for the flag (Joe: shell, Ann: comb, Sam: flag). The person holding the shell swaps it for the brush (Joe: brush, Ann: comb, Sam: flag). The person holding the brush swaps it for the fork (Joe: fork, Ann: comb, Sam: flag). The person holding the flag swaps it for the sock (Joe: fork, Ann: comb, Sam: sock). The person holding the fork swaps it for the box (Joe: box, Ann: comb, Sam: sock). The person holding the box swaps it for the coin (Joe: coin, Ann: comb, Sam: sock). The person holding the sock swaps it for the rock (Joe: coin, Ann: comb, Sam: rock). The person holding the comb swaps it for the clip (Joe: coin, Ann: clip, Sam: rock). The person holding the coin swaps it for the rope (Joe: rope, Ann: clip, Sam: rock). What is Sam holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    154,
+    237,
+    319,
+    402,
+    488,
+    574,
+    660,
+    748,
+    834,
+    919,
+    1002,
+    1086,
+    1171,
+    1256,
+    1341
+   ]
+  ]
+ },
+ "k5_h10_1": {
+  "item": {
+   "k": 5,
+   "h": 10,
+   "item_id": 1,
+   "names": [
+    "Joe",
+    "Tom",
+    "Ben"
+   ],
+   "poi": "Joe",
+   "chains": {
+    "Joe": [
+     "rope",
+     "kite",
+     "bag",
+     "clip",
+     "vase",
+     "fan"
+    ],
+    "Tom": [
+     "comb",
+     "coin",
+     "cup",
+     "bowl",
+     "key"
+    ],
+    "Ben": [
+     "stick",
+     "chain",
+     "book",
+     "lamp",
+     "box",
+     "brush",
+     "sock"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "stick",
+     "new": "chain",
+     "state": {
+      "Joe": "rope",
+      "Tom": "comb",
+      "Ben": "chain"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "comb",
+     "new": "coin",
+     "state": {
+      "Joe": "rope",
+      "Tom": "coin",
+      "Ben": "chain"
+     }
+    },
+    {
+     "step": 2,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "chain",
+     "new": "book",
+     "state": {
+      "Joe": "rope",
+      "Tom": "coin",
+      "Ben": "book"
+     }
+    },
+    {
+     "step": 3,
+     "is_needle": true,
+     "who": "Joe",
+     "cond": "rope",
+     "new": "kite",
+     "state": {
+      "Joe": "kite",
+      "Tom": "coin",
+      "Ben": "book"
+     }
+    },
+    {
+     "step": 4,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "book",
+     "new": "lamp",
+     "state": {
+      "Joe": "kite",
+      "Tom": "coin",
+      "Ben": "lamp"
+     }
+    },
+    {
+     "step": 5,
+     "is_needle": true,
+     "who": "Joe",
+     "cond": "kite",
+     "new": "bag",
+     "state": {
+      "Joe": "bag",
+      "Tom": "coin",
+      "Ben": "lamp"
+     }
+    },
+    {
+     "step": 6,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "lamp",
+     "new": "box",
+     "state": {
+      "Joe": "bag",
+      "Tom": "coin",
+      "Ben": "box"
+     }
+    },
+    {
+     "step": 7,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "box",
+     "new": "brush",
+     "state": {
+      "Joe": "bag",
+      "Tom": "coin",
+      "Ben": "brush"
+     }
+    },
+    {
+     "step": 8,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "coin",
+     "new": "cup",
+     "state": {
+      "Joe": "bag",
+      "Tom": "cup",
+      "Ben": "brush"
+     }
+    },
+    {
+     "step": 9,
+     "is_needle": false,
+     "who": "Ben",
+     "cond": "brush",
+     "new": "sock",
+     "state": {
+      "Joe": "bag",
+      "Tom": "cup",
+      "Ben": "sock"
+     }
+    },
+    {
+     "step": 10,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "cup",
+     "new": "bowl",
+     "state": {
+      "Joe": "bag",
+      "Tom": "bowl",
+      "Ben": "sock"
+     }
+    },
+    {
+     "step": 11,
+     "is_needle": true,
+     "who": "Joe",
+     "cond": "bag",
+     "new": "clip",
+     "state": {
+      "Joe": "clip",
+      "Tom": "bowl",
+      "Ben": "sock"
+     }
+    },
+    {
+     "step": 12,
+     "is_needle": true,
+     "who": "Joe",
+     "cond": "clip",
+     "new": "vase",
+     "state": {
+      "Joe": "vase",
+      "Tom": "bowl",
+      "Ben": "sock"
+     }
+    },
+    {
+     "step": 13,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "bowl",
+     "new": "key",
+     "state": {
+      "Joe": "vase",
+      "Tom": "key",
+      "Ben": "sock"
+     }
+    },
+    {
+     "step": 14,
+     "is_needle": true,
+     "who": "Joe",
+     "cond": "vase",
+     "new": "fan",
+     "state": {
+      "Joe": "fan",
+      "Tom": "key",
+      "Ben": "sock"
+     }
+    }
+   ],
+   "last_is_needle": true,
+   "floor": [
+    "pen",
+    "map",
+    "bell",
+    "ring",
+    "jar",
+    "drum",
+    "nail",
+    "hat",
+    "fork",
+    "flag",
+    "rock",
+    "shell"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nJoe holds the rope. Tom holds the comb. Ben holds the stick. The person holding the stick swaps it for the chain. The person holding the comb swaps it for the coin. The person holding the chain swaps it for the book. The person holding the rope swaps it for the kite. The person holding the book swaps it for the lamp. The person holding the kite swaps it for the bag. The person holding the lamp swaps it for the box. The person holding the box swaps it for the brush. The person holding the coin swaps it for the cup. The person holding the brush swaps it for the sock. The person holding the cup swaps it for the bowl. The person holding the bag swaps it for the clip. The person holding the clip swaps it for the vase. The person holding the bowl swaps it for the key. The person holding the vase swaps it for the fan. What is Joe holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    129,
+    180,
+    232,
+    283,
+    334,
+    384,
+    434,
+    485,
+    535,
+    587,
+    637,
+    687,
+    738,
+    788,
+    838
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nJoe holds the rope. Tom holds the comb. Ben holds the stick. The person holding the stick swaps it for the chain (Joe: rope, Tom: comb, Ben: chain). The person holding the comb swaps it for the coin (Joe: rope, Tom: coin, Ben: chain). The person holding the chain swaps it for the book (Joe: rope, Tom: coin, Ben: book). The person holding the rope swaps it for the kite (Joe: kite, Tom: coin, Ben: book). The person holding the book swaps it for the lamp (Joe: kite, Tom: coin, Ben: lamp). The person holding the kite swaps it for the bag (Joe: bag, Tom: coin, Ben: lamp). The person holding the lamp swaps it for the box (Joe: bag, Tom: coin, Ben: box). The person holding the box swaps it for the brush (Joe: bag, Tom: coin, Ben: brush). The person holding the coin swaps it for the cup (Joe: bag, Tom: cup, Ben: brush). The person holding the brush swaps it for the sock (Joe: bag, Tom: cup, Ben: sock). The person holding the cup swaps it for the bowl (Joe: bag, Tom: bowl, Ben: sock). The person holding the bag swaps it for the clip (Joe: clip, Tom: bowl, Ben: sock). The person holding the clip swaps it for the vase (Joe: vase, Tom: bowl, Ben: sock). The person holding the bowl swaps it for the key (Joe: vase, Tom: key, Ben: sock). The person holding the vase swaps it for the fan (Joe: fan, Tom: key, Ben: sock). What is Joe holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    164,
+    250,
+    336,
+    421,
+    506,
+    589,
+    671,
+    756,
+    839,
+    923,
+    1006,
+    1090,
+    1175,
+    1258,
+    1340
+   ]
+  ]
+ },
+ "k5_h10_2": {
+  "item": {
+   "k": 5,
+   "h": 10,
+   "item_id": 2,
+   "names": [
+    "Tom",
+    "Amy",
+    "Sam"
+   ],
+   "poi": "Sam",
+   "chains": {
+    "Tom": [
+     "ring",
+     "chain",
+     "flag",
+     "bell",
+     "fork",
+     "fan"
+    ],
+    "Amy": [
+     "book",
+     "clip",
+     "nail",
+     "brush",
+     "pen",
+     "stick"
+    ],
+    "Sam": [
+     "hat",
+     "kite",
+     "sock",
+     "bowl",
+     "comb",
+     "map"
+    ]
+   },
+   "updates": [
+    {
+     "step": 0,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "hat",
+     "new": "kite",
+     "state": {
+      "Tom": "ring",
+      "Amy": "book",
+      "Sam": "kite"
+     }
+    },
+    {
+     "step": 1,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "ring",
+     "new": "chain",
+     "state": {
+      "Tom": "chain",
+      "Amy": "book",
+      "Sam": "kite"
+     }
+    },
+    {
+     "step": 2,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "kite",
+     "new": "sock",
+     "state": {
+      "Tom": "chain",
+      "Amy": "book",
+      "Sam": "sock"
+     }
+    },
+    {
+     "step": 3,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "sock",
+     "new": "bowl",
+     "state": {
+      "Tom": "chain",
+      "Amy": "book",
+      "Sam": "bowl"
+     }
+    },
+    {
+     "step": 4,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "chain",
+     "new": "flag",
+     "state": {
+      "Tom": "flag",
+      "Amy": "book",
+      "Sam": "bowl"
+     }
+    },
+    {
+     "step": 5,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "flag",
+     "new": "bell",
+     "state": {
+      "Tom": "bell",
+      "Amy": "book",
+      "Sam": "bowl"
+     }
+    },
+    {
+     "step": 6,
+     "is_needle": false,
+     "who": "Amy",
+     "cond": "book",
+     "new": "clip",
+     "state": {
+      "Tom": "bell",
+      "Amy": "clip",
+      "Sam": "bowl"
+     }
+    },
+    {
+     "step": 7,
+     "is_needle": false,
+     "who": "Amy",
+     "cond": "clip",
+     "new": "nail",
+     "state": {
+      "Tom": "bell",
+      "Amy": "nail",
+      "Sam": "bowl"
+     }
+    },
+    {
+     "step": 8,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "bowl",
+     "new": "comb",
+     "state": {
+      "Tom": "bell",
+      "Amy": "nail",
+      "Sam": "comb"
+     }
+    },
+    {
+     "step": 9,
+     "is_needle": false,
+     "who": "Amy",
+     "cond": "nail",
+     "new": "brush",
+     "state": {
+      "Tom": "bell",
+      "Amy": "brush",
+      "Sam": "comb"
+     }
+    },
+    {
+     "step": 10,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "bell",
+     "new": "fork",
+     "state": {
+      "Tom": "fork",
+      "Amy": "brush",
+      "Sam": "comb"
+     }
+    },
+    {
+     "step": 11,
+     "is_needle": true,
+     "who": "Sam",
+     "cond": "comb",
+     "new": "map",
+     "state": {
+      "Tom": "fork",
+      "Amy": "brush",
+      "Sam": "map"
+     }
+    },
+    {
+     "step": 12,
+     "is_needle": false,
+     "who": "Tom",
+     "cond": "fork",
+     "new": "fan",
+     "state": {
+      "Tom": "fan",
+      "Amy": "brush",
+      "Sam": "map"
+     }
+    },
+    {
+     "step": 13,
+     "is_needle": false,
+     "who": "Amy",
+     "cond": "brush",
+     "new": "pen",
+     "state": {
+      "Tom": "fan",
+      "Amy": "pen",
+      "Sam": "map"
+     }
+    },
+    {
+     "step": 14,
+     "is_needle": false,
+     "who": "Amy",
+     "cond": "pen",
+     "new": "stick",
+     "state": {
+      "Tom": "fan",
+      "Amy": "stick",
+      "Sam": "map"
+     }
+    }
+   ],
+   "last_is_needle": false,
+   "floor": [
+    "key",
+    "lamp",
+    "cup",
+    "coin",
+    "box",
+    "bag",
+    "jar",
+    "rope",
+    "drum",
+    "vase",
+    "rock",
+    "shell"
+   ]
+  },
+  "derived": [
+   "<|im_start|>user\nTom holds the ring. Amy holds the book. Sam holds the hat. The person holding the hat swaps it for the kite. The person holding the ring swaps it for the chain. The person holding the kite swaps it for the sock. The person holding the sock swaps it for the bowl. The person holding the chain swaps it for the flag. The person holding the flag swaps it for the bell. The person holding the book swaps it for the clip. The person holding the clip swaps it for the nail. The person holding the bowl swaps it for the comb. The person holding the nail swaps it for the brush. The person holding the bell swaps it for the fork. The person holding the comb swaps it for the map. The person holding the fork swaps it for the fan. The person holding the brush swaps it for the pen. The person holding the pen swaps it for the stick. What is Sam holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    124,
+    176,
+    227,
+    278,
+    330,
+    381,
+    432,
+    483,
+    534,
+    586,
+    637,
+    687,
+    737,
+    788,
+    839
+   ]
+  ],
+  "copyable": [
+   "<|im_start|>user\nTom holds the ring. Amy holds the book. Sam holds the hat. The person holding the hat swaps it for the kite (Tom: ring, Amy: book, Sam: kite). The person holding the ring swaps it for the chain (Tom: chain, Amy: book, Sam: kite). The person holding the kite swaps it for the sock (Tom: chain, Amy: book, Sam: sock). The person holding the sock swaps it for the bowl (Tom: chain, Amy: book, Sam: bowl). The person holding the chain swaps it for the flag (Tom: flag, Amy: book, Sam: bowl). The person holding the flag swaps it for the bell (Tom: bell, Amy: book, Sam: bowl). The person holding the book swaps it for the clip (Tom: bell, Amy: clip, Sam: bowl). The person holding the clip swaps it for the nail (Tom: bell, Amy: nail, Sam: bowl). The person holding the bowl swaps it for the comb (Tom: bell, Amy: nail, Sam: comb). The person holding the nail swaps it for the brush (Tom: bell, Amy: brush, Sam: comb). The person holding the bell swaps it for the fork (Tom: fork, Amy: brush, Sam: comb). The person holding the comb swaps it for the map (Tom: fork, Amy: brush, Sam: map). The person holding the fork swaps it for the fan (Tom: fan, Amy: brush, Sam: map). The person holding the brush swaps it for the pen (Tom: fan, Amy: pen, Sam: map). The person holding the pen swaps it for the stick (Tom: fan, Amy: stick, Sam: map). What is Sam holding? Answer in one word.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
+   [
+    158,
+    245,
+    331,
+    417,
+    503,
+    588,
+    673,
+    758,
+    843,
+    930,
+    1016,
+    1100,
+    1183,
+    1265,
+    1349
+   ]
+  ]
+ }
+}

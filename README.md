@@ -141,6 +141,68 @@ over in-stream commas: `ans_queried`, `ans_tracked`, `in_tracked` (split into
 never a count) and `*_floor` (5–9). Behaviour is `top1`; `collision_rate` is
 how often two tracked counts share a value.
 
+### state_tracking
+
+Not a keep-track stream. Three people each hold an object; each update names
+its person by the object they hold now ("The person holding the key swaps it
+for the pen."), so the answer to "What is {name} holding?" needs every update
+in order. `k` updates hit the person asked about, `h` hit others; cells are
+`k` 1-5 by `h` in {1, k, 2k}, 30 items each, the same items in both arms. Arm
+`copyable` writes the full state after every update. Read at the answer and
+at the period ending each update. `--limit N` is items per cell.
+
+```bash
+python -m cogniload.cli state_tracking --arm derived --model dev --limit 5
+python -m cogniload.cli state_tracking --arm copyable --model dev --limit 5
+python -m cogniload.cli report state_tracking --model dev
+modal run modal_app.py --stage state_tracking --arm derived --model dev --limit 5
+modal run modal_app.py --stage state_tracking --arm copyable --model dev --limit 5
+modal run modal_app.py --stage report --experiment state_tracking --model dev
+```
+
+Read T1 first: `top1` per arm, `k` and `h` (derived should fall with `k`,
+copyable stay at ceiling), `top1_hay_last` against `top1_needle_last` (if only
+the latter is high, the model answers the last new object), and the error
+shares (`poi_stale_j`, `other_*`, `out_of_prompt`). The `argmax` lines below
+it must be objects, not ` the`. T2 is the answer position per arm and `k`:
+`target`, `chain_1`...`chain_k` (the person's earlier objects, `j` steps
+back), `other_current`, `other_stale`, `hay_matched` (recency control), all
+against `floor`. In the copyable arm `target` must be well above `floor`, or
+the readout fails its positive control. T3 (derived, `k` 3-4, correct items):
+median first legible layer per chain object and the share in chain order, vs
+`baseline`. T4 (derived): wrong items beside correct ones.
+
+### hay_factorial
+
+state_tracking's derived arm with the hays untied from the chain: `k` in {1,
+3, 5} by `h` in {0, 2, 4, 8, 12}, 60 items per cell. Within each cell,
+`tail_hays` (hays after the asked-about person's last needle) splits equally
+over {0, 2, 4} (those ≤ `h`); `pre_hays` is the rest. Both are columns of the
+summary. If the object pool is too small for `h = 12`, `h` is capped at 10 and
+the manifest says so (`h_capped`). No `report` yet; the summaries carry
+`correct`, `k`, `h`, `pre_hays`, `tail_hays`.
+
+```bash
+python -m cogniload.cli hay_factorial --model dev --limit 5
+modal run modal_app.py --stage hay_factorial --model dev --limit 5
+```
+
+### hay_type
+
+`k = 3`, `h = 6`, `tail_hays = 2`, 60 items, the same items in every arm; only
+the hay sentences differ. `same`: "The person holding the lamp swaps it for
+the map."; `named`: "Ben swaps the lamp for the map."; `reworded`: "Whoever has
+the lamp trades it for the map.". Needles always use the first form. The
+reference is hay_factorial's `k = 3, h = 0` cell. The smoke prints one prompt
+per arm.
+
+```bash
+python -m cogniload.cli hay_type --arm same --model dev --limit 5
+modal run modal_app.py --stage hay_type --arm same --model dev --limit 5
+modal run modal_app.py --stage hay_type --arm named --model dev --limit 5
+modal run modal_app.py --stage hay_type --arm reworded --model dev --limit 5
+```
+
 ## Outputs
 
 Under `results/<alias>/`, or the `cogniload-results` Modal volume at
@@ -154,6 +216,9 @@ Under `results/<alias>/`, or the `cogniload-results` Modal volume at
 | `<experiment>_manifest.json` | model spec, prompt templates, exemplars, config |
 
 derived_state names carry the arm: `derived_state_copyable_ct2.parquet`.
+state_tracking shards are per cell, with the arm: `state_tracking_derived_k3_h6.parquet`.
+hay_factorial shards are per cell (`hay_factorial_k3_h4.parquet`); hay_type's carry
+the arm (`hay_type_named_k3_h6.parquet`).
 
 Presence is band-min rank ≤ `readout.primary_k` (25). `rank` is over the full
 vocabulary; `rank_wordlike` over word-like tokens only, which is what
@@ -174,6 +239,8 @@ src/cogniload/
   forced_demand.py        forced_demand: same shape
   retro_cue.py            retro_cue: same shape
   derived_state.py        derived_state: same shape, plus the arm
+  state_tracking.py       state_tracking: its own items (no streams), the arm, tables
+  hay_load.py             hay_factorial and hay_type: state_tracking items with the hays varied
   prompts.py              shared templates; chat rendering with the thinking assertion
   readout.py              lens ranks per word, layer and position
   stimuli.py              seeded stream generation (pure)
