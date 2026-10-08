@@ -8,7 +8,7 @@ import pytest
 import yaml
 from conftest import CONFIG, Tokenizer
 
-from cogniload import bands, experiment, prompts, registry, single_cue
+from cogniload import bands, experiment, prompts, registry
 
 
 @pytest.mark.parametrize("alias", ["dev", "prod"])
@@ -75,9 +75,7 @@ def test_band_must_exist_and_sit_inside_the_recorded_layers(tmp_path):
 
 # --- prompts --------------------------------------------------------------------
 
-USER = "Track these categories: animal, fruit."
-WORDS = ["cat", "pear", "red", "dog", "plum"]
-TRACKED = ("animal", "fruit")
+USER = "What is the capital of France? Answer in one word."
 
 
 def test_thinking_off_renders_the_empty_block_and_prefill_follows_it(tok):
@@ -98,18 +96,3 @@ def test_thinking_assertion_catches_the_silent_failure(tok):
 
     with pytest.raises(AssertionError, match="reasoning ON"):
         prompts.render_chat(Ignores(), USER, enable_thinking=False)
-
-
-def test_recent_is_one_user_turn_ending_in_the_prefill(tok):
-    out = prompts.build_recent(tok, WORDS, TRACKED, "animal", enable_thinking=False)
-    assert out.count("<|im_start|>user") == 1
-    assert out.endswith("<think>\n\n</think>\n\nAnswer:")
-    assert "cat, pear, red" in out and "most recent animal" in out
-
-
-def test_list_all_is_a_fresh_render_with_no_question_in_context(tok):
-    """Following the single-cue answer would leave one category resolved in context."""
-    out = single_cue.build_list_all(tok, WORDS, TRACKED, enable_thinking=False)
-    assert out.count("<|im_start|>user") == 1
-    assert "most recent animal" not in out
-    assert out.endswith("<think>\n\n</think>\n\n")

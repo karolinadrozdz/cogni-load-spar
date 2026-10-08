@@ -1,5 +1,5 @@
-"""Fakes for running an experiment's `run_stream` without a GPU: the real Qwen3
-chat template, one token per whitespace-separated word, and random lens logits."""
+"""Fakes for running an experiment without a GPU: the real Qwen3 chat template,
+one token per whitespace-separated word, and random lens logits."""
 
 import re
 import sys
@@ -11,11 +11,9 @@ import torch
 import yaml
 
 from cogniload import registry
-from cogniload.exemplars import POOLS
 
 TEMPLATE = Path(__file__).parent / "fixtures" / "qwen3_chat_template.jinja"
 CONFIG = yaml.safe_load((registry.REGISTRY.parent / "experiments.yaml").read_text())
-POOL = {c: w[:CONFIG["stream"]["n_exemplars_per_category"]] for c, w in POOLS.items()}
 VOCAB = 2000
 
 
@@ -71,11 +69,11 @@ def tok():
 
 @pytest.fixture
 def ctx(monkeypatch, tok):
-    """What `experiment.run` hands each `run_stream`, with the model and lens faked."""
+    """What an experiment's runner works with, with the model and lens faked."""
     vis = types.ModuleType("jlens.vis")
     vis._meaningful_token_mask = lambda tokenizer, v, device: torch.ones(v, dtype=torch.bool)
     monkeypatch.setitem(sys.modules, "jlens", types.ModuleType("jlens"))
     monkeypatch.setitem(sys.modules, "jlens.vis", vis)
     torch.manual_seed(0)
     return types.SimpleNamespace(model=Model(), lens=Lens(), spec=registry.resolve("dev"),
-                                 config=CONFIG, pool=POOL, layers=[10, 11, 12], band=(11, 13))
+                                 config=CONFIG, layers=[10, 11, 12], band=(11, 13))

@@ -1,17 +1,14 @@
-# cogni-load-spar
+# cogni-load-spar — `metacog` branch
 
-Does the J-space hold the task state a model is maintaining, or only what is
-recent or about to be output? If it does, can J-space content serve as a proxy
-for cognitive load?
+Does the J-space encode the model's confidence: the boundary between what it
+knows and what it does not?
 
-Every experiment builds the same seeded keep-track streams (a list of words
-from eight categories, some of them tracked), reads them through the Jacobian
-lens and a logit-lens control, and writes parquet. Rows join across
-experiments on `(stream_id, c_t)`, where `c_t` is the number of tracked
-categories.
+This branch holds only the shared infrastructure for reading a prompt through
+the Jacobian lens and a logit-lens control. The keep-track experiments it was
+cut from (`single_cue`, `forced_demand`, `retro_cue`, `derived_state`), their
+specs and their findings are on `exp/aveizi/task-finding`.
 
-Why each measurement is the way it is: [`DECISIONS.md`](DECISIONS.md). Results
-so far: [`FINDINGS.md`](FINDINGS.md).
+Why each measurement is the way it is: [`DECISIONS.md`](DECISIONS.md).
 
 ## Setup
 
@@ -33,24 +30,7 @@ the `python -m cogniload.cli` commands directly. macOS cannot run a stage.
 `enable_thinking: false`), then select it with `--model <alias>` or `model:` in
 `configs/experiments.yaml`. Run `find_band` for the new alias first.
 
-## Change the task
-
-- **Streams:** the `stream:` block of `configs/experiments.yaml`, and the word
-  pools in `exemplars.py`. All experiments share them.
-- **Prompts:** `prompts.py` holds the shared stream instruction and the
-  single question; each experiment's own prompts are constants at the top of
-  its module. Every template used is written verbatim to the run manifest.
-- **A new experiment:** a module with `run_stream(ctx, stream) -> (rows,
-  summary)`, `run` and `report`, a config block, and its name in
-  `cli.EXPERIMENTS`. The shared blocks are in `experiment.py`.
-
 ## Run
-
-Every stage takes `--model dev|prod`, `--limit N` (streams per `c_t`, for a
-smoke run; writes `_limit` files) and `--force` (redo shards that exist;
-otherwise a stage resumes). On Modal the GPU follows the alias (`dev` L4,
-`prod` H100, override with `--gpu`); `report` gets none. Run Modal commands
-from the repo root.
 
 ### find_band (once per model)
 
@@ -59,124 +39,57 @@ python -m cogniload.cli find_band --model dev
 modal run modal_app.py --stage find_band --model dev
 ```
 
-Writes `band.json`: the layer band where the lens reads two-hop bridge
-entities. Every experiment reads in this band.
+Writes `results/<alias>/band.json`: the layer band where the lens reads two-hop
+bridge entities. Every experiment reads in this band. On Modal the GPU follows
+the alias (`dev` L4, `prod` H100, override with `--gpu`); run from the repo root.
 
-### single_cue
+### confidence
 
-Keep-track stream, then "What was the most recent {category}?". Read at the
-comma inside the stream (`in_stream`), the final `.` (`stream_end`) and the
-`Answer:` prefill (`answer`).
-
-```bash
-python -m cogniload.cli single_cue --model dev --limit 20
-python -m cogniload.cli report single_cue --model dev
-modal run modal_app.py --stage single_cue --model dev --limit 20
-modal run modal_app.py --stage report --experiment single_cue --model dev
-```
-
-Read `FLOOR CHECK` first: if the queried target is present at the answer in
-under 50% of streams on both rank columns, every number below is a null that
-looks like a finding. Then `CAPACITY` (`mean` = non-queried targets present
-per stream, at `readout_at = in_stream`, across `c_t`: a rise then a plateau is
-a ceiling, flat at ~1 is the deflationary result), `SELECTIVITY`
-(`target_non_queried` against `untracked_final` and `absent`), and `HEADLINE`
-(every group, pooled over `c_t`; compare each to `absent`).
-
-### forced_demand
-
-The same stream, then "List the most recent word for each tracked category, in
-alphabetical order": to emit the first word the model needs every target. Read
-at the `Answer:` prefill.
+"What is the capital of {entity}? Answer in one word." for 50 real and 50
+invented countries (`stimuli/capitals.csv`), prefilled with `Answer:` so the
+next token is the answer. Read at that position for uncertainty words, words
+for something not existing, and neutral control words.
 
 ```bash
-python -m cogniload.cli forced_demand --model dev --limit 5
-python -m cogniload.cli report forced_demand --model dev
-modal run modal_app.py --stage forced_demand --model dev --limit 5
-modal run modal_app.py --stage report --experiment forced_demand --model dev
+python stimuli/capitals.py                                # only after editing the lists
+python -m cogniload.cli confidence --model dev --limit 5  # 5 items per condition
+python -m cogniload.cli confidence --model dev
+python -m cogniload.cli report confidence --model dev
 ```
 
-Read the first table (`rank_wordlike`, J-lens): `targets_mean` (targets present
-per stream), `t1`…`t6` (the target that is alphabetically 1st…6th, the order of
-emission), `replaced`, `label_tracked`, `label_untracked`, against
-`floor_word` and `floor_label`; behaviour in `q1_top1` (first word) and
-`list_correct`. The single_cue table for the same streams follows it.
+Read the first table (`rank_wordlike`, J-lens), one row per condition and
+output type (`correct`, `guess`, `abstain`): `uncertain` and `nonexistent`
+against `control`. The row that matters is `fictitious` / `guess`, where the
+model names a capital and so no uncertainty word is about to be output.
+`answer` is the capital itself, for real items.
 
-### retro_cue
+Outputs, under `results/<alias>/`: `confidence.parquet` (one row per word ×
+layer × lens), `confidence_summary.parquet` (one row per item: the model's
+output and its type) and `confidence_manifest.json`.
 
-Ask for tracked category A, put the model's one-token answer back as an
-assistant turn, then ask for B. Read at both answers (`pos1`, `pos2`).
+### Adding an experiment
 
-```bash
-python -m cogniload.cli retro_cue --model dev --limit 5
-python -m cogniload.cli report retro_cue --model dev
-modal run modal_app.py --stage retro_cue --model dev --limit 5
-modal run modal_app.py --stage report --experiment retro_cue --model dev
-```
-
-Read `target_A` and `target_B` at `position` 1 and 2, against `floor_word`:
-does A's word leave when the cue moves to B?
-
-### derived_state
-
-The stream cut at a seeded point, then "How many {category} words have appeared
-so far?". Arm `derived` shows the plain stream, so the counts exist only in the
-model; arm `copyable` writes each tracked word's running count after it. Read at
-every in-stream comma and at the answer, for the digits 0–9 and the words
-zero–nine.
-
-```bash
-python -m cogniload.cli derived_state --arm derived --model dev --limit 5
-python -m cogniload.cli derived_state --arm copyable --model dev --limit 5
-python -m cogniload.cli report derived_state --model dev
-modal run modal_app.py --stage derived_state --arm derived --model dev --limit 5
-modal run modal_app.py --stage derived_state --arm copyable --model dev --limit 5
-modal run modal_app.py --stage report --experiment derived_state --model dev
-```
-
-One table per arm. `ans_*` columns are at the answer position, `in_*` pooled
-over in-stream commas: `ans_queried`, `ans_tracked`, `in_tracked` (split into
-`in_tracked_just`, the word just read, and `in_tracked_other`), `*_untracked`,
-`*_stale` (the superseded count). Compare them to `*_floor4` (4 is in range but
-never a count) and `*_floor` (5–9). Behaviour is `top1`; `collision_rate` is
-how often two tracked counts share a value.
-
-## Outputs
-
-Under `results/<alias>/`, or the `cogniload-results` Modal volume at
-`<alias>/` (fetch with `modal volume get cogniload-results prod ./results/prod`):
-
-| file | contents |
-|---|---|
-| `band.json` | the band, and the per-layer medians that chose it |
-| `<experiment>_ct{c}[_limit].parquet` | one row per word × layer × position × lens: `rank`, `rank_wordlike`, `role`, `readout_at`, `in_band` |
-| `<experiment>_summary_ct{c}[_limit].parquet` | one row per stream: behaviour and read positions |
-| `<experiment>_manifest.json` | model spec, prompt templates, exemplars, config |
-
-derived_state names carry the arm: `derived_state_copyable_ct2.parquet`.
-
-Presence is band-min rank ≤ `readout.primary_k` (25). `rank` is over the full
-vocabulary; `rank_wordlike` over word-like tokens only, which is what
-Neuronpedia shows.
+A module in `src/cogniload/` with `run` and `report`, a block in
+`configs/experiments.yaml`, and its name in `cli.EXPERIMENTS`. The shared
+blocks are in `experiment.py`.
 
 ## Layout
 
 ```
 configs/models.yaml       model + lens registry
-configs/experiments.yaml  every experiment's settings; names an alias
+configs/experiments.yaml  settings; names an alias
 modal_app.py              runs one CLI stage on Modal
+stimuli/capitals.py       the item lists; writes capitals.csv
 src/cogniload/
   cli.py                  stage runner
-  experiment.py           shared blocks: layers, streams, words read, two-lens readout,
-                          scoring, the per-c_t shard loop, loading results
+  confidence.py           confidence: prompt, run_item, table
+  experiment.py           shared blocks: layers, two-lens readout, scoring, generation
   find_band.py            band discovery
-  single_cue.py           single_cue: prompt, run_stream, tables
-  forced_demand.py        forced_demand: same shape
-  retro_cue.py            retro_cue: same shape
-  derived_state.py        derived_state: same shape, plus the arm
-  prompts.py              shared templates; chat rendering with the thinking assertion
+  prompts.py              chat rendering with the thinking assertion
   readout.py              lens ranks per word, layer and position
-  stimuli.py              seeded stream generation (pure)
-  exemplars.py            category word pools, filtered to single tokens
   registry.py, bands.py   alias -> spec; band.json
 ```
+
+Presence is band-min rank ≤ `readout.primary_k` (25). `rank` is over the full
+vocabulary; `rank_wordlike` over word-like tokens only, which is what
+Neuronpedia shows.

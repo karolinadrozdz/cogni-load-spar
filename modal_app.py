@@ -1,9 +1,8 @@
 """Modal entrypoint: one `cogniload.cli` stage on a GPU (no GPU for `report`).
 
     modal run modal_app.py --stage find_band --model dev
-    modal run modal_app.py --stage single_cue --model dev --limit 20
-    modal run modal_app.py --stage derived_state --arm copyable --model prod
-    modal run modal_app.py --stage report --experiment single_cue --model prod
+    modal run modal_app.py --stage <experiment> --model dev --limit 20
+    modal run modal_app.py --stage report --experiment <experiment> --model prod
 
 Run from the repo root: the image picks up `src/` and `configs/` from there.
 Two volumes persist: an HF cache (the 54 GB prod download happens once) and
@@ -26,6 +25,7 @@ image = (
     })
     .add_local_dir("src", "/repo/src")
     .add_local_dir("configs", "/repo/configs")
+    .add_local_dir("stimuli", "/repo/stimuli")
 )
 
 app = modal.App("cogni-load-spar", image=image)
@@ -58,10 +58,10 @@ def run_stage(args: list[str]) -> str:
 
 
 @app.local_entrypoint()
-def main(stage: str = "find_band", experiment: str = "", arm: str = "", model: str = "dev",
+def main(stage: str = "find_band", experiment: str = "", model: str = "dev",
          limit: int = 0, force: bool = False, gpu: str = ""):
     args = [stage, *([experiment] if experiment else []), "--model", model,
-            *(["--arm", arm] if arm else []), *(["--limit", str(limit)] if limit else []),
+            *(["--limit", str(limit)] if limit else []),
             *(["--force"] if force else [])]
     # GPU follows the alias; `report` reads parquet only.
     fn = run_stage if stage == "report" else run_stage.with_options(

@@ -1,14 +1,10 @@
 """Stage runner.
 
-    python -m cogniload.cli find_band
-    python -m cogniload.cli single_cue [--limit N] [--force] [--model dev|prod]
-    python -m cogniload.cli forced_demand
-    python -m cogniload.cli retro_cue
-    python -m cogniload.cli derived_state --arm derived|copyable
+    python -m cogniload.cli find_band [--force] [--model dev|prod]
+    python -m cogniload.cli <experiment> [--limit N] [--force]
     python -m cogniload.cli report <experiment>
 
-A stage skips any C_t whose shard already exists unless --force. `report`
-reads parquet only.
+`report` reads parquet only.
 """
 
 from __future__ import annotations
@@ -22,7 +18,8 @@ import yaml
 
 from cogniload import registry
 
-EXPERIMENTS = ["single_cue", "forced_demand", "retro_cue", "derived_state"]
+#: Experiment modules, each with `run` and `report`.
+EXPERIMENTS = ["confidence"]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,17 +27,14 @@ def main(argv: list[str] | None = None) -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("stage", choices=["find_band", *EXPERIMENTS, "report"])
     parser.add_argument("experiment", nargs="?", choices=EXPERIMENTS, help="what to report")
-    parser.add_argument("--arm", choices=["derived", "copyable"], help="derived_state only")
     parser.add_argument("--config", default="configs/experiments.yaml")
     parser.add_argument("--model", help="registry alias; overrides the config's")
     parser.add_argument("--out-dir", help="overrides the config's out_dir")
-    parser.add_argument("--limit", type=int, help="streams per C_t, for a smoke run")
-    parser.add_argument("--force", action="store_true", help="redo shards that exist")
+    parser.add_argument("--limit", type=int, help="items per condition, for a smoke run")
+    parser.add_argument("--force", action="store_true", help="redo outputs that exist")
     args = parser.parse_args(argv)
     if (args.stage == "report") != bool(args.experiment):
         parser.error("name an experiment after `report`, and only there")
-    if (args.stage == "derived_state") != bool(args.arm):
-        parser.error("--arm is required for derived_state, and only for it")
 
     config = yaml.safe_load(Path(args.config).read_text())
     results = Path(args.out_dir or config["out_dir"])
@@ -53,8 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.stage == "find_band":
         module.run(spec, config, results, force=args.force)
     else:
-        arm = {"arm": args.arm} if args.arm else {}
-        module.run(spec, config, results, limit=args.limit, force=args.force, **arm)
+        module.run(spec, config, results, limit=args.limit, force=args.force)
     return 0
 
 

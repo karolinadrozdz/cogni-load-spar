@@ -1,8 +1,11 @@
 # Decisions
 
 Open choices, each with what was decided, why, and what would reopen it.
-Experiments: `find_band` (band discovery), `single_cue` (Experiment 1),
-`forced_demand` and `retro_cue` (Experiment 2), `derived_state` (Experiment 3).
+
+Only the entries that govern the shared infrastructure on this branch are kept,
+with their original numbers and text. Some still mention the keep-track
+experiments they were written for; those, and D2, D6, D7, D9, D15-D19 and
+D21-D23, are on `exp/aveizi/task-finding`.
 
 ---
 
@@ -58,27 +61,6 @@ So:
 
 **Reopens if:** the plateau moves with k (then there is no capacity finding and
 the measure needs F2 before the indicator can be scored).
-
-## D2 — Scope: band discovery, then capacity, eviction, selectivity
-
-**Decided:** `find_band`, then `single_cue` in condition C2 (internal) only, at
-the `C_t` levels of D16. Measures: capacity, eviction, selectivity, plus the
-list-all self-report scored descriptively. Controls: the logit lens, and
-recency-matched untracked items within each stream (D1). The R2 report gate
-and Q3 confidence are not implemented (D10).
-
-**Deferred to v2, in order:** (1) held-out probes, (2) C1 externalized, (3) the
-projection-based controls (random matched-dimension, PCA matched-variance) and
-the k-free capacity measure, which travel with the probes, (4) R3
-internal-reasoning replication.
-
-**Why:** capacity, eviction and selectivity are the three questions the
-keep-track task was chosen to answer; everything else is a covariate or a
-control. Probes come first because analysis §4.5 — does self-report track
-J-space presence or general decodability? — decides the project's direction
-under spec §6, and it cannot run without a decodability measure to hold fixed.
-Until then the self-report is descriptive only and **§6's branch cannot be
-taken.**
 
 ## D3 — Model selection goes through a registry alias, never a literal
 
@@ -146,66 +128,6 @@ hybrid linear/full attention); jlens resolves it via
 `Layout("model.language_model")`, loaded with `AutoModelForCausalLM` as in the
 jlens walkthrough.
 
-## D6 — Every category present appears the same number of times; C_t varies only the instruction
-
-**Signed off.**
-
-**Decided:** `updates_per_tracked = 3`, `tail_guard = 3`, and *every* category
-in the exemplar set appears exactly 3 times whether tracked or not. With 8
-categories that is a 24-item stream at every `C_t`: 6/4/2 distractor categories
-for `C_t` = 2/4/6, giving 18/12/6 distractor items. Stream length and
-`n_distractor_categories` are both derived, not configured — to use fewer
-categories, pass a subset of the exemplar dict.
-
-**Why this deviates from spec §1 (`L = 18`, six categories present):** the spec
-is internally inconsistent. With `L = 18` over six categories each tracked
-category is updated ~3 times *regardless* of `C_t`, contradicting "3–9 times
-depending on C_t"; and at `C_t = 6` all 18 slots are tracked, leaving no
-distractors, which makes the selectivity analysis (§4.4) impossible at the
-largest tracked-set size.
-
-**Why equal frequency, and not just equal totals:** fixing the stream length
-at 24 and letting two distractor categories absorb the remainder would give
-those categories 9 items each at `C_t = 2` against 3 for each tracked
-category. That makes untracked items differ from targets in category
-*frequency* as well as in instruction — a confound sitting directly on the
-selectivity contrast. Holding every category to 3 occurrences makes the stream
-structurally identical across `C_t`, so the only thing that varies is the
-"Track these categories" line, which is precisely the manipulation.
-
-**Also an interpretation:** §1's rejection rule ("reject streams where any
-tracked category's last exemplar is in the final 3 positions for all
-categories") is ambiguous — read literally it can never fire for `C_t > 3`.
-Implemented as *no target may fall in the last 3 positions*, so the answer is
-never simply the most recent word overall, which is what the parenthetical
-"keeps recency and category separable" asks for. Because any tracked item in
-the tail is necessarily its category's last occurrence, this is exactly
-equivalent to "the tail is all distractors", and is constructed directly rather
-than reject-sampled (the admissible region is ~1% of orderings at `C_t = 6`).
-Target recency spans 4–21.
-
-**Reopens if:** C2 accuracy is at ceiling or floor (spec §5 anticipates
-recalibrating L and C_t).
-
-## D7 — Ambiguous exemplars are dropped, not assigned
-
-**Decided:** a word may belong to exactly one of the eight categories.
-`orange` and `olive` (fruit/colour) are excluded, and so are words whose second
-category is simply absent from their own pool: `organ`, `bass`, `horn`
-(instrument/body part, instrument/fish, instrument/body part), `file`, `level`,
-`punch` (tool/other senses), `back` (body part/direction), `date` (fruit/time),
-`bat` (animal/implement), `coral` (colour/animal), `kiwi` (fruit/bird).
-`exemplars._assert_disjoint` enforces the in-pool case; the rest is judgement
-recorded in the pool comment.
-
-**Why, including the ones past position 12:** a word in two categories has no
-defined role (target / replaced / untracked) when it appears in a stream. Spec
-§8 bars exemplars equal to a category name for the same reason; this is the
-same hazard one step out. Pruning words that filtering would usually never
-reach still matters, because *which* words a pool reaches depends on the
-tokenizer — a polysemous word can enter silently on one model and not another,
-making a cross-model discrepancy look like a result.
-
 ## D8 — The registry is never machine-rewritten; the band lives with the results
 
 **Decided:** `configs/models.yaml` is read-only to the code. `find_band` writes
@@ -217,24 +139,6 @@ the file and silently drops every comment in it — including the block
 explaining that `enable_thinking` is mandatory and why. Declared configuration
 and discovered quantities should not share a file when one of them has to be
 written programmatically.
-
-## D9 — Turn structure is fixed in code, not left to the caller
-
-**Decided:** each prompt is built by one function (`prompts.build_recent`,
-`single_cue.build_list_all`, and each experiment's own builder).
-
-- **Q1** (the single question) — one user turn containing the stream *and* the question; assistant
-  prefilled `Answer:`; one token greedy. Two user turns would need an assistant
-  reply in between, which would put model-generated text in context before the
-  measurement. The readout position is the final token of the rendered prompt.
-- **Q2** (list all) — a **fresh render from the same stream**, not a
-  continuation of Q1. If Q2 followed Q1's answer, one tracked category would
-  already be resolved in context and its self-report would not be comparable to
-  the other categories'.
-
-**Why in code:** the stream text and each question are separate templates, so
-how they combine is exactly the kind of thing two collaborators would implement
-differently in two scripts without noticing.
 
 ## D10 — No swap intervention, no R2 report gate
 
@@ -312,100 +216,6 @@ manifest — the registry's own rule, applied to code. `jlens` itself requires
 and then fails at load. The Modal image installs from `pyproject.toml`, so the
 pin is written once.
 
-## D15 — Three readout positions, not per-position trajectories
-
-**Decided:** `single_cue` reads every stream at three token positions:
-
-- **`in_stream`** — the comma after the second-to-last word. Primary: every
-  target has been seen, none is privileged, the query is not yet known, and the
-  model is still disposed to continue the list.
-- **`stream_end`** — the final `.`, where the model continues the instruction
-  rather than the list. A contrast.
-- **`answer`** — the `Answer:` prefill, a retrieval measure.
-
-No per-position trajectories.
-
-**Why `in_stream` is primary.** Q1 names one tracked category, so at the answer
-position the queried target is simultaneously task state *and* the literal next
-token — its presence cannot distinguish "the J-space holds task state" from
-"the J-space holds what is about to be output". Inside the stream no target is
-privileged and nothing is about to be emitted. That is what capacity and
-selectivity want; the answer position is kept as the comparison. All three come
-from one forward pass.
-
-Reading the **delimiter** rather than the word follows the paper's own capacity
-protocol ("at every comma position", `data/experiments/README.md`): a word is
-trivially top-ranked at its own position because the model is processing it.
-With `tail_guard` the final stream item is always untracked, so reading at the
-word would plant a guaranteed false positive on the control side.
-
-**Why no trajectories.** Three reasons, in order of weight:
-
-1. *Confounded.* The spec's eviction analysis fits a step-vs-decay curve to an
-   item's coefficient across positions. Every word spikes at its own position,
-   so the putative "step at replacement" arrives at exactly the position where
-   the replacement's own spike does. The single-position form — is a superseded
-   item still present when its replacement is? — has no such artifact, with
-   `untracked_superseded` as the "went stale without being task-relevant"
-   baseline.
-2. *Alignment.* Token positions and stream positions need a full per-item
-   mapping; three positions need one lookup each.
-3. *Cost.* ~120 positions per stream against 3.
-
-**What is lost:** the shape of the decay. We keep the fact of it.
-
-## D16 — Five C_t levels at 30 streams, not three at 100
-
-**Decided:** `c_ts: [2, 3, 4, 5, 6]`, `n_streams: 30` — 150 streams.
-
-**Why:** the capacity question is about the *shape* of the curve. Three points
-leave no degrees of freedom to test a saturating curve against a line, so they
-can only distinguish "flat" from "rising" — and if the knee is at a human-like
-3–4, three levels straddle it invisibly. Precision per point matters less than
-having points: the SE on a mean count is small even at n=30, while curve shape
-is unidentifiable at any n with three levels. Sampling breadth over sampling
-depth.
-
-It also helps yield at the top end: the matched control (untracked
-final, outside the tail) falls to ~0.1 per stream at `C_t = 6`, so the
-intermediate levels carry the contrast.
-
-## D17 — A floor gate before the full run
-
-**Decided:** run `single_cue --limit 20` and check `report single_cue`'s floor
-line before the full run. If the queried target is not present at the answer position in
-≥50% of streams at primary k, stop and diagnose.
-
-**Why `find_band` does not cover this:** it tests single-concept prompts. A
-24-word stream is a far harder regime. If
-presence is at floor in the task, all three measures return nulls that look
-like findings, and we would only learn that after the full run. The absent-word
-baselines make the check meaningful: they give "present" a chance floor, which
-band-min rank over several layers otherwise lacks.
-
-## D18 — forced_demand: the question, and the instruction before the readout
-
-**Decided:** the question is "List the most recent word for each tracked
-category, in alphabetical order. Answer with the words only, separated by
-commas.", in the same user turn as the stream, prefilled `Answer:`, thinking
-off. The readout sits at the `:` of `Answer:`, so the alphabetical instruction
-comes before it: to emit the first word the model has to compare all `C_t`
-targets. Behaviour is the rank of the alphabetically-first target (sorted
-case-insensitively, since country names are capitalised) at that position;
-`list_correct` is a `split(",")` + `strip()` comparison only. No fallback
-question: first-word top-1 at `C_t = 2` was 33% on prod (40% on the dev smoke),
-above the 20% at which the spec would switch to asking for a category name.
-
-## D19 — retro_cue: cue selection and the three-message render
-
-**Decided:** A = `queried_category`; B = the next tracked category after A in
-`stream.tracked`, wrapping. `a1` is the argmax of the position-1 readout pass's
-own logits (no separate generation). Position 2 is rendered as
-`[user: stream + Q(A), assistant: "Answer: {a1}", user: Q(B)]` through
-`render_chat(..., prefill="Answer:")` (`retro_cue.build_second_cue`). The Qwen3
-template renders the historical assistant turn as plain text with no think
-block; only the final generation prompt carries the empty think block.
-
 ## D20 — The lens is pinned to a commit
 
 **Decided:** `lens_revision` in `models.yaml` is a commit sha, passed to
@@ -413,39 +223,28 @@ block; only the final generation prompt carries the empty think block.
 non-sha. A branch such as `qwen-n1000` would follow its head, so the lens could
 change under a fixed config (D3, D14).
 
-## D21 — derived_state: digit answer prefill and scoring
+## D24 — confidence: stimuli, word groups and output types
 
-**Decided:** prefill `"Answer: "` with the trailing space,
-since `" 3"` is two tokens on this tokenizer (`" "` + `"3"`). The answer is
-scored on the bare digit id at the last prompt token, from the readout pass's
-own logits: rank, top-1, and rank among the ids for 0–3. `score_q1` is not
-used: it encodes `" {expected}"`, which is two tokens for a digit. Two tokens
-are greedy-generated and stored raw (`gen_tok1`, `gen_tok2`). On the dev smoke
-the first generated token was a bare digit in 50/50 streams (both arms),
-followed by `<|im_end|>`, so the spec's alternative (prefill `"Answer:"`, score
-the second generated token) is not implemented. Readout tokens: bare digits
-`0`–`9` and the space-prefixed number
-words ` zero`–` nine`, each asserted to be one token; a value is present if its
-digit or its word has band-min rank ≤ 25.
+**Decided:** one template, "What is the capital of {entity}? Answer in one
+word.", prefilled `Answer:`, over 50 real countries and 50 invented ones
+(`stimuli/capitals.py`). Every real capital is one token after a space on the
+Qwen tokenizer, checked against the pinned `dev` tokenizer. Countries with a
+contested or multi-word capital, or named like their capital, are left out.
 
-## D22 — derived_state: truncation and count collisions
+Read at the prefill, in three groups fixed before any run
+(`confidence.GROUPS`): `uncertain`, `nonexistent`, and `control` as the floor.
+Each concept is read in lower case and capitalised, whichever are single
+tokens, and is present if either form is.
 
-**Decided:** streams are `experiment.streams` (the shared seeds), truncated to
-`words[:p]` with
-`p = random.Random(f"exp3-{stream_id}-{c_t}").randint(8, 21)` (inclusive;
-`derived_state.trunc_range` in the config). Counts are over the truncated stream (0–3; the queried
-answer can be 0). Groups are scored per category, not per token. An untracked
-category's count is scored only where its value is not also some tracked
-category's current count. A stale value (c − 1 for a tracked count c ≥ 1) is
-skipped when it equals a tracked category's current count, and the number
-skipped is reported. The table also reports the collision rate: positions
-where two or more tracked categories share a count. Floor: values 5–9.
+Each item's output is typed from eight greedy tokens: `correct`, `abstain`
+(first word in `confidence.ABSTAIN`) or `guess`. The raw text is stored, so the
+typing can be redone.
 
-## D23 — derived_state: copyable-arm annotation
+**Why:** an uncertainty word in the J-space is uninformative when the model is
+about to say "Unknown"; it is then the next token. Only an invented country
+answered with a name separates held uncertainty from output staging.
 
-**Decided:** the copyable arm writes each **tracked** word as
-`word (category n)`, with the category string as in `stream.tracked` and `n`
-that category's running count including this word. Untracked words are not
-annotated. The derived arm is the plain stream. Readout positions are the
-comma token after items 1..p−1, located by character offsets. `),` may be a
-single token, so the assertion is only that the read token contains `,`.
+**Known limits:** invented names are 2-3 tokens where real ones are 1, so the
+two conditions differ in form as well as in knowledge. The control words are
+common nouns, not frequency-matched to the uncertainty words. The invented
+names were not searched against real or fictional places.

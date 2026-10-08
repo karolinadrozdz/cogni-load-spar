@@ -1,7 +1,7 @@
-"""Prompt text shared across experiments, and the one way to render a chat prompt.
+"""The one way to render a chat prompt, and the shared answer prefill.
 
-Templates are plain strings; each experiment writes the ones it used into its
-manifest verbatim, so a result always records the text that produced it.
+Each experiment keeps its own templates as plain strings and writes the ones
+it used into its manifest verbatim, so a result always records its text.
 """
 
 from __future__ import annotations
@@ -12,14 +12,6 @@ from typing import Any
 _THINK_OFF = "<think>\n\n</think>\n\n"
 _THINK_ON = "<think>\n"
 
-KEEP_TRACK = (
-    "Track these categories: {tracked}. "
-    "Here is a sequence of words: {stream}. "
-    "Remember the most recent word from each tracked category."
-)
-# "Answer in one word": without it Qwen answers in markdown (argmax ` **`),
-# which measures formatting rather than memory.
-RECENT = "What was the most recent {category}? Answer in one word."
 PREFILL = "Answer:"
 
 
@@ -48,15 +40,3 @@ def _assert_thinking(text: str, enable_thinking: bool) -> None:
             if text.endswith(other) and not enable_thinking
             else "template does not match the expected Qwen3 thinking contract")
     raise AssertionError(f"{hint}; generation prompt ended with {text[-40:]!r}")
-
-
-def stream_turn(words: list[str], tracked: tuple[str, ...], question: str) -> str:
-    """The keep-track instruction and stream, then `question`, as one user turn."""
-    return KEEP_TRACK.format(tracked=", ".join(tracked), stream=", ".join(words)) + " " + question
-
-
-def build_recent(tokenizer: Any, words: list[str], tracked: tuple[str, ...], category: str,
-                 *, enable_thinking: bool) -> str:
-    """Stream + "most recent {category}?" in one user turn, prefilled."""
-    return render_chat(tokenizer, stream_turn(words, tracked, RECENT.format(category=category)),
-                       enable_thinking=enable_thinking, prefill=PREFILL)
