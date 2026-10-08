@@ -67,3 +67,24 @@ def read(model: Any, lens: Any, prompt: str, words: Sequence[str], token_ids: Se
                   "rank": int(rank[pi, i]), "rank_wordlike": int(rank_w[pi, i])}
                  for i, w in enumerate(words) for pi, p in enumerate(positions)]
     return rows, model_logits.cpu()
+
+
+def top_tokens(model: Any, lens: Any, prompt: str, *, layers: Sequence[int], position: int,
+               k: int, use_jacobian: bool = True) -> list[dict]:
+    """The `k` highest-ranked word-like tokens at one position, per layer.
+
+    The open-vocabulary view: what the lens shows, with no word list chosen in
+    advance.
+    """
+    from jlens.vis import _meaningful_token_mask
+
+    lens_logits, _, _ = lens.apply(model, prompt, layers=list(layers), positions=[position],
+                                   use_jacobian=use_jacobian)
+    rows = []
+    for layer in sorted(lens_logits):
+        logits = lens_logits[layer][0]
+        wordlike = _meaningful_token_mask(model.tokenizer, logits.shape[-1], logits.device)
+        top = logits.masked_fill(~wordlike, float("-inf")).topk(k).indices.tolist()
+        rows += [{"layer": layer, "rank": r + 1, "token": model.tokenizer.decode([i])}
+                 for r, i in enumerate(top)]
+    return rows

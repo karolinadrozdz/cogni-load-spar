@@ -261,3 +261,39 @@ nearly what the J-lens does and a word can be present only as a runner-up for
 the output. The early window is the range before the queried word became
 readable in the keep-track runs (absent through L18). It was fixed after a
 10-item smoke run seen in-band only, and before the full run.
+
+## D26 — confidence: real regions, and an open top-token readout
+
+**Decided:** a third condition, `region`: 130 real first-level regions with
+their capitals, asked as "{region}, {country}" in the same template. They come
+from a Wikidata query (`stimuli/regions.py`, snapshot committed), filtered by
+rule: one capital, not a national capital, plain ASCII names, a one-word
+capital that is one token and does not appear in the region's name, at least
+20 Wikipedia language editions, and one region per capital. The number of
+editions (`links`) is kept as a measure of how well known the region is.
+
+Alongside the fixed word list, the top 25 word-like tokens at each layer are
+stored for both lenses (`confidence_top.parquet`), and the report lists the
+tokens found in more items of one set than of another.
+
+**Why:** the first run had no confident wrong answers; the model never invents
+a capital for an invented country, and it recognises those names as made up.
+Real regions give right and wrong named answers under one condition, so the
+two can be compared with the output type held fixed. The fixed list found its
+effect in two of twelve words and could not have found a word that was not on
+it; the top tokens show what the lens holds without that choice.
+
+**Status of each:** the fixed list is the pre-committed test and is unchanged
+from D24. The top-token comparison is exploratory.
+
+The two stimuli sets run separately (`--set capitals`, `--set regions`) and
+write separate files, so a new set does not require the earlier one to be run
+again.
+
+**Known limits:** the set is every region that passes the rules, not a sample
+of obscure ones. Requiring a one-token capital removes most little-known
+regions (162 of 1,035 otherwise usable pass it), so about a quarter of the set
+is little known, and those capitals are often common words ("Salt", "Same", "Paradise"). An answer is scored against the Wikidata
+label only, so another name for the same city counts as wrong. The Wikidata
+entries were not checked one by one.
+

@@ -1,7 +1,7 @@
 """Modal entrypoint: one `cogniload.cli` stage on a GPU (no GPU for `report`).
 
     modal run modal_app.py --stage find_band --model dev
-    modal run modal_app.py --stage <experiment> --model dev --limit 20
+    modal run modal_app.py --stage confidence --stimuli-set regions --model dev --limit 5
     modal run modal_app.py --stage report --experiment <experiment> --model prod
 
 Run from the repo root: the image picks up `src/` and `configs/` from there.
@@ -58,9 +58,11 @@ def run_stage(args: list[str]) -> str:
 
 
 @app.local_entrypoint()
-def main(stage: str = "find_band", experiment: str = "", model: str = "dev",
+def main(stage: str = "find_band", experiment: str = "", stimuli_set: str = "",
+         model: str = "dev",
          limit: int = 0, force: bool = False, gpu: str = ""):
     args = [stage, *([experiment] if experiment else []), "--model", model,
+            *(["--set", stimuli_set] if stimuli_set else []),
             *(["--limit", str(limit)] if limit else []),
             *(["--force"] if force else [])]
     # GPU follows the alias; `report` reads parquet only.

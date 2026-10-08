@@ -1,7 +1,7 @@
 """Stage runner.
 
     python -m cogniload.cli find_band [--force] [--model dev|prod]
-    python -m cogniload.cli <experiment> [--limit N] [--force]
+    python -m cogniload.cli confidence --set capitals|regions [--limit N] [--force]
     python -m cogniload.cli report <experiment>
 
 `report` reads parquet only.
@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("stage", choices=["find_band", *EXPERIMENTS, "report"])
     parser.add_argument("experiment", nargs="?", choices=EXPERIMENTS, help="what to report")
+    parser.add_argument("--set", dest="stimuli_set", help="confidence only: the stimuli set")
     parser.add_argument("--config", default="configs/experiments.yaml")
     parser.add_argument("--model", help="registry alias; overrides the config's")
     parser.add_argument("--out-dir", help="overrides the config's out_dir")
@@ -35,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if (args.stage == "report") != bool(args.experiment):
         parser.error("name an experiment after `report`, and only there")
+    if (args.stage == "confidence") != bool(args.stimuli_set):
+        parser.error("--set is required for confidence, and only for it")
 
     config = yaml.safe_load(Path(args.config).read_text())
     results = Path(args.out_dir or config["out_dir"])
@@ -47,7 +50,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.stage == "find_band":
         module.run(spec, config, results, force=args.force)
     else:
-        module.run(spec, config, results, limit=args.limit, force=args.force)
+        extra = {"stimuli_set": args.stimuli_set} if args.stimuli_set else {}
+        module.run(spec, config, results, limit=args.limit, force=args.force, **extra)
     return 0
 
 

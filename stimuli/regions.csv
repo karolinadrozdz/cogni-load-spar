@@ -1,0 +1,131 @@
+id,condition,entity,answer,links
+100,region,"California, United States",Sacramento,287
+101,region,"Hawaii, United States",Honolulu,269
+102,region,"Texas, United States",Austin,259
+103,region,"New York, United States",Albany,247
+104,region,"Arizona, United States",Phoenix,245
+105,region,"Alabama, United States",Montgomery,241
+106,region,"Illinois, United States",Springfield,238
+107,region,"Ohio, United States",Columbus,235
+108,region,"Virginia, United States",Richmond,234
+109,region,"Georgia, United States",Atlanta,231
+110,region,"Colorado, United States",Denver,230
+111,region,"Northern Ireland, United Kingdom",Belfast,230
+112,region,"Massachusetts, United States",Boston,229
+113,region,"Oregon, United States",Salem,226
+114,region,"Tennessee, United States",Nashville,226
+115,region,"Michigan, United States",Lansing,225
+116,region,"Wisconsin, United States",Madison,225
+117,region,"Washington, United States",Olympia,223
+118,region,"Connecticut, United States",Hartford,222
+119,region,"Idaho, United States",Boise,222
+120,region,"Nebraska, United States",Lincoln,221
+121,region,"Delaware, United States",Dover,220
+122,region,"Mississippi, United States",Jackson,220
+123,region,"Catalonia, Spain",Barcelona,218
+124,region,"South Carolina, United States",Columbia,217
+125,region,"Maine, United States",Augusta,216
+126,region,"Montana, United States",Helena,216
+127,region,"New Hampshire, United States",Concord,216
+128,region,"North Carolina, United States",Raleigh,216
+129,region,"West Virginia, United States",Charleston,215
+130,region,"Rhode Island, United States",Providence,214
+131,region,"South Dakota, United States",Pierre,213
+132,region,"Bavaria, Germany",Munich,206
+133,region,"Sicily, Italy",Palermo,195
+134,region,"Sardinia, Italy",Cagliari,188
+135,region,"Ontario, Canada",Toronto,183
+136,region,"Saxony, Germany",Dresden,179
+137,region,"British Columbia, Canada",Victoria,176
+138,region,"New South Wales, Australia",Sydney,171
+139,region,"Alberta, Canada",Edmonton,169
+140,region,"Rhineland-Palatinate, Germany",Mainz,169
+141,region,"Queensland, Australia",Brisbane,168
+142,region,"Schleswig-Holstein, Germany",Kiel,166
+143,region,"Tuscany, Italy",Florence,165
+144,region,"Lombardy, Italy",Milan,161
+145,region,"Tamil Nadu, India",Chennai,158
+146,region,"Manitoba, Canada",Winnipeg,156
+147,region,"Nova Scotia, Canada",Halifax,156
+148,region,"West Bengal, India",Kolkata,155
+149,region,"Apulia, Italy",Bari,154
+150,region,"Saskatchewan, Canada",Regina,154
+151,region,"Veneto, Italy",Venice,153
+152,region,"Victoria, Australia",Melbourne,153
+153,region,"Aragon, Spain",Zaragoza,152
+154,region,"South Australia, Australia",Adelaide,152
+155,region,"Western Australia, Australia",Perth,150
+156,region,"Emilia-Romagna, Italy",Bologna,148
+157,region,"Campania, Italy",Naples,144
+158,region,"Northern Territory, Australia",Darwin,138
+159,region,"Umbria, Italy",Perugia,138
+160,region,"Basilicata, Italy",Potenza,136
+161,region,"Trentino-South Tyrol, Italy",Trento,134
+162,region,"Friuli Venezia Giulia, Italy",Trieste,133
+163,region,"Pays de la Loire, France",Nantes,132
+164,region,"Cantabria, Spain",Santander,130
+165,region,"Telangana, India",Hyderabad,127
+166,region,"Bahia, Brazil",Salvador,125
+167,region,"Styria, Austria",Graz,120
+168,region,"Amazonas, Brazil",Manaus,119
+169,region,"Sindh, Pakistan",Karachi,118
+170,region,"Rio Grande do Norte, Brazil",Natal,116
+171,region,"Jalisco, Mexico",Guadalajara,113
+172,region,"Punjab, Pakistan",Lahore,112
+173,region,"Brittany, France",Rennes,111
+174,region,"Nouvelle-Aquitaine, France",Bordeaux,109
+175,region,"Grand Est, France",Strasbourg,108
+176,region,"Hauts-de-France, France",Lille,105
+177,region,"Occitania, France",Toulouse,104
+178,region,"East Java, Indonesia",Surabaya,100
+179,region,"Gauteng, South Africa",Johannesburg,98
+180,region,"West Java, Indonesia",Bandung,93
+181,region,"North Sumatra, Indonesia",Medan,92
+182,region,"Central Java, Indonesia",Semarang,90
+183,region,"Mazandaran Province, Iran",Sari,89
+184,region,"West Sumatra, Indonesia",Padang,87
+185,region,"Banten, Indonesia",Serang,82
+186,region,"South Sumatra, Indonesia",Palembang,78
+187,region,"South Sulawesi, Indonesia",Makassar,75
+188,region,"West Kazakhstan Region, Kazakhstan",Oral,75
+189,region,"Valle del Cauca Department, Colombia",Cali,68
+190,region,"Autonomous Region of Bougainville, Papua New Guinea",Buka,67
+191,region,"Risaralda Department, Colombia",Pereira,67
+192,region,"Beni Department, Bolivia",Trinidad,66
+193,region,"Carabobo, Venezuela",Valencia,65
+194,region,"Teleorman County, Romania",Alexandria,62
+195,region,"Plateau State, Nigeria",Jos,61
+196,region,"Guanacaste Province, Costa Rica",Liberia,57
+197,region,"Wasit Governorate, Iraq",Kut,56
+198,region,"Nineveh Governorate, Iraq",Mosul,55
+199,region,"Waikato Region, New Zealand",Hamilton,55
+200,region,"Cerro Largo Department, Uruguay",Melo,53
+201,region,"Lavalleja Department, Uruguay",Minas,52
+202,region,"Soriano Department, Uruguay",Mercedes,50
+203,region,"Vestland, Norway",Bergen,49
+204,region,"Orellana Province, Ecuador",Coca,47
+205,region,"Volta Region, Ghana",Ho,46
+206,region,"Upper West Region, Ghana",Wa,45
+207,region,"Jonglei, South Sudan",Bor,44
+208,region,"Southern District, Botswana",Kanye,42
+209,region,"Jufra, Libya",Hun,40
+210,region,"Lempira Department, Honduras",Gracias,40
+211,region,"Balqa Governorate, Jordan",Salt,39
+212,region,"Kanem Region, Chad",Mao,37
+213,region,"Nazinon, Burkina Faso",Manga,36
+214,region,"Brakna, Mauritania",Aleg,35
+215,region,"Lac Region, Chad",Bol,35
+216,region,"Mayo-Kebbi Ouest Region, Chad",Pala,34
+217,region,"Trarza, Mauritania",Rosso,34
+218,region,"Manufahi Municipality, Timor-Leste",Same,33
+219,region,"Maryland County, Liberia",Harper,33
+220,region,"Grand Bassa County, Liberia",Buchanan,32
+221,region,"Sinoe County, Liberia",Greenville,32
+222,region,"Southern Province, Sierra Leone",Bo,32
+223,region,"Demerara-Mahaica, Guyana",Paradise,30
+224,region,"Saint Andrew Parish, Dominica",Wesley,30
+225,region,"Yap State, Federated States of Micronesia",Colonia,30
+226,region,"Hela Province, Papua New Guinea",Tari,29
+227,region,"Upper Demerara-Berbice, Guyana",Linden,29
+228,region,"Ash Sharqiyah South Governorate, Oman",Sur,25
+229,region,"Saint James Windward Parish, Saint Kitts and Nevis",Newcastle,23

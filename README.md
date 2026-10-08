@@ -45,33 +45,48 @@ the alias (`dev` L4, `prod` H100, override with `--gpu`); run from the repo root
 
 ### confidence
 
-"What is the capital of {entity}? Answer in one word." for 50 real and 50
-invented countries (`stimuli/capitals.csv`), prefilled with `Answer:` so the
-next token is the answer. Read at that position for uncertainty words, words
-for something not existing, and neutral control words.
+"What is the capital of {entity}? Answer in one word.", prefilled with
+`Answer:` so the next token is the answer. Two stimuli sets, run separately:
+
+| `--set` | file | condition | items |
+|---|---|---|---|
+| `capitals` | `stimuli/capitals.csv` | `real`, `fictitious` | 50 countries, 50 invented ones |
+| `regions` | `stimuli/regions.csv` | `region` | 130 real regions, from famous to little known, from Wikidata |
+
+Read at the prefill in two ways: a fixed list of uncertainty words, words for
+something not existing and control words (`confidence.GROUPS`); and the top 25
+word-like tokens at each layer, with nothing chosen in advance.
 
 ```bash
-python stimuli/capitals.py                                # only after editing the lists
-python -m cogniload.cli confidence --model dev --limit 5  # 5 items per condition
-python -m cogniload.cli confidence --model dev
-python -m cogniload.cli report confidence --model dev
+python -m cogniload.cli confidence --set regions --model dev --limit 5  # 5 items per condition
+python -m cogniload.cli confidence --set regions --model dev
+python -m cogniload.cli report confidence --model dev                   # every set that was run
 ```
 
-Read the first table (`rank_wordlike`, J-lens), one row per condition and
-output type (`correct`, `guess`, `abstain`): `uncertain` and `nonexistent`
-against `control`. The row that matters is `fictitious` / `guess`, where the
-model names a capital and so no uncertainty word is about to be output.
-`answer` is the capital itself, for real items. `out_*` is the share of items
-where a word of that group is in the model's own top-k next tokens; where it
-matches the lens columns, the lens is showing runners-up for the output.
+The report, in order:
 
-The same tables follow for an earlier layer window
-(`confidence.early_fraction`), where the answer is not yet readable, and then
-a per-layer profile for each lens.
+1. The fixed-list table, one row per condition and output type (`correct`,
+   `guess` = a name that is not the capital, `abstain`): `uncertain` and
+   `nonexistent` against `control`, in the band and then in an earlier window
+   (`confidence.early_fraction`). `out_*` is the share of items where a word of
+   that group is in the model's own top-k next tokens.
+2. A per-layer profile for each lens.
+3. Top tokens: the tokens in the top 25 of more items of one set than another,
+   for `region` wrong names against correct ones, and `fictitious` against
+   `real`. This part is exploratory.
 
-Outputs, under `results/<alias>/`: `confidence.parquet` (one row per word ×
-layer × lens), `confidence_summary.parquet` (one row per item: the model's
-output and its type) and `confidence_manifest.json`.
+The comparison that matters is `region` / `guess` against `region` /
+`correct`: the output is a name in both, so a difference is not output staging.
+
+Outputs, under `results/<alias>/`, per set: `confidence_<set>.parquet` (fixed
+list: one row per word × layer × lens), `confidence_<set>_top.parquet` (top
+tokens per item, layer and lens), `confidence_<set>_summary.parquet` (one row
+per item: the model's output, its type and its probability) and
+`confidence_<set>_manifest.json`.
+
+To rebuild a stimuli file, run the script beside it (`stimuli/capitals.py`,
+`stimuli/regions.py`). `regions.py` filters the committed Wikidata snapshot
+`stimuli/regions_wikidata.csv` and needs the `dev` tokenizer from the Hub.
 
 ### Adding an experiment
 
@@ -86,6 +101,7 @@ configs/models.yaml       model + lens registry
 configs/experiments.yaml  settings; names an alias
 modal_app.py              runs one CLI stage on Modal
 stimuli/capitals.py       the item lists; writes capitals.csv
+stimuli/regions.py        filters the Wikidata snapshot; writes regions.csv
 src/cogniload/
   cli.py                  stage runner
   confidence.py           confidence: prompt, run_item, table

@@ -18,7 +18,10 @@ readout:
   record_layer_fraction: [0.25, 0.85]
 
 confidence:
-  stimuli: stimuli/capitals.csv      # written by stimuli/capitals.py
+  sets:                              # run one with --set; each written by the script beside it
+    capitals: stimuli/capitals.csv   # 50 real and 50 invented countries
+    regions: stimuli/regions.csv     # 130 real regions, from famous to little known
+  top_k: 25                          # top word-like tokens kept per layer
   max_new_tokens: 8                  # enough to tell a named capital from a refusal
   # A second window, before the answer is readable: on dev the queried word of
   # the keep-track runs is absent through L18 of 32. Fixed before the full run.

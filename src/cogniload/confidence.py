@@ -1,12 +1,14 @@
 """confidence: does the J-space carry uncertainty when the model does not know?
 
-"What is the capital of {entity}?" for real and invented countries, prefilled
-so the next token is the answer. Read at the `Answer:` prefill for uncertainty
-words, words for something not existing, and neutral control words.
+"What is the capital of {entity}?" for real countries, invented countries and
+real regions from famous to obscure, prefilled so the next token is the answer.
+Read at the `Answer:` prefill in two ways: a fixed list of uncertainty words,
+words for something not existing and neutral control words; and the top
+word-like tokens at each layer, with nothing chosen in advance.
 
-The cell that matters is an invented country the model answers with a name
-anyway: no uncertainty word is about to be output there, so one present in the
-J-space is not output staging.
+The comparison that matters is among items the model answers with a name: the
+ones it gets right against the ones it gets wrong. The output looks the same,
+so a difference in the J-space is not output staging.
 """
 
 from __future__ import annotations
@@ -46,8 +48,10 @@ ABSTAIN = {"unknown", "none", "n", "na", "unsure", "uncertain", "sorry", "i", "n
 
 
 def load_items(path: Path) -> list[dict]:
+    """The items of one stimuli file; `links` is only set where the file has it."""
     with Path(path).open(encoding="utf-8", newline="") as f:
-        return [{**r, "id": int(r["id"])} for r in csv.DictReader(f)]
+        return [{**r, "id": int(r["id"]), "links": int(r["links"]) if r.get("links") else None}
+                for r in csv.DictReader(f)]
 
 
 def words(tokenizer: Any) -> dict[str, dict]:
@@ -80,7 +84,9 @@ def output_type(text: str, answer: str) -> str:
     return "abstain" if not first or first[0].casefold() in ABSTAIN else "guess"
 
 
-def run_item(ctx: SimpleNamespace, item: dict, word_meta: dict[str, dict]) -> tuple[list[dict], dict]:
+def run_item(ctx: SimpleNamespace, item: dict,
+             word_meta: dict[str, dict]) -> tuple[list[dict], list[dict], dict]:
+    """One item: fixed-list rows, top-token rows, and the summary row."""
     tok, answer = ctx.model.tokenizer, item["answer"]
     text = build(tok, item["entity"], enable_thinking=ctx.spec["enable_thinking"])
     last = ctx.model.encode(text).shape[-1] - 1
@@ -89,6 +95,11 @@ def run_item(ctx: SimpleNamespace, item: dict, word_meta: dict[str, dict]) -> tu
         meta[answer] = {"group": "answer", "concept": answer}
     meta = {w: {**m, "id": item["id"]} for w, m in meta.items()}
     rows, logits = experiment.read_both(ctx, text, meta, {last: "answer"})
+    top_rows = [{**r, "id": item["id"], "lens": name}
+                for name, jacobian in (("jlens", True), ("logit", False))
+                for r in readout.top_tokens(ctx.model, ctx.lens, text, layers=ctx.layers,
+                                            position=last, k=ctx.config["confidence"]["top_k"],
+                                            use_jacobian=jacobian)]
 
     logits = logits[0]
     top = logits.topk(5)
@@ -103,51 +114,63 @@ def run_item(ctx: SimpleNamespace, item: dict, word_meta: dict[str, dict]) -> tu
     summary = {
         **{f"output_rank_{g}": int(r) for g, r in out_rank.items()},
         **item, "answer_pos": last, "top1": decoded[0],
+        # How sure the model is of its first token.
+        "top1_prob": float(logits.float().softmax(-1).max()),
         "top5": " | ".join(f"{t}:{v:.2f}" for t, v in zip(decoded, top.values.tolist())),
         # Rank of the capital in the model's own next-token distribution.
         "expected_rank": int(readout.rank_of(
             logits[None], torch.tensor([readout.token_id(tok, answer)]))[0, 0]) if answer else None,
         "generated": generated, "output_type": output_type(generated, answer),
     }
-    return rows, summary
+    return rows, top_rows, summary
 
 
-def _paths(alias: str, results_dir: Path, limit: bool) -> tuple[Path, Path]:
-    out, suffix = Path(results_dir) / alias, "_limit" if limit else ""
-    return out / f"confidence{suffix}.parquet", out / f"confidence_summary{suffix}.parquet"
+def _paths(alias: str, results_dir: Path, name: str, limit: bool) -> tuple[Path, Path, Path]:
+    """Fixed-list rows, top-token rows, and the per-item summary, for stimuli set `name`."""
+    stem, suffix = Path(results_dir) / alias / f"confidence_{name}", "_limit" if limit else ""
+    return (stem.with_name(f"{stem.name}{suffix}.parquet"),
+            stem.with_name(f"{stem.name}_top{suffix}.parquet"),
+            stem.with_name(f"{stem.name}_summary{suffix}.parquet"))
 
 
-def run(spec: dict, config: dict, results_dir: Path, *, limit: int | None = None,
-        force: bool = False) -> None:
-    """Run every item, or the first `limit` per condition; write rows, summary and manifest."""
-    shard, summary_path = _paths(spec["alias"], results_dir, bool(limit))
+def run(spec: dict, config: dict, results_dir: Path, *, stimuli_set: str,
+        limit: int | None = None, force: bool = False) -> None:
+    """Run one stimuli set, or its first `limit` items per condition; write rows,
+    top tokens, summary and manifest."""
+    sets = config["confidence"]["sets"]
+    if stimuli_set not in sets:
+        raise KeyError(f"unknown stimuli set {stimuli_set!r}; config has: {', '.join(sets)}")
+    shard, top_path, summary_path = _paths(spec["alias"], results_dir, stimuli_set, bool(limit))
     if shard.exists() and not force:
         print(f"{shard.name} exists, skipping (use --force to redo)")
         return
     layers = experiment.recorded_layers(spec, config)
-    items = load_items(ROOT / config["confidence"]["stimuli"])
+    items = load_items(ROOT / sets[stimuli_set])
     if limit:
-        items = [i for c in ("real", "fictitious")
+        items = [i for c in dict.fromkeys(x["condition"] for x in items)
                  for i in [x for x in items if x["condition"] == c][:limit]]
     model, lens = registry.load(spec)
     ctx = SimpleNamespace(model=model, lens=lens, spec=spec, config=config, layers=layers,
                           band=spec["band"])
     word_meta = words(model.tokenizer)
-    print(f"confidence: {len(items)} items, layers {layers[0]}-{layers[-1]}, band {spec['band']}")
+    print(f"confidence {stimuli_set}: {len(items)} items, layers {layers[0]}-{layers[-1]}, "
+          f"band {spec['band']}")
 
-    rows, summaries = [], []
+    rows, top_rows, summaries = [], [], []
     for item in items:
-        item_rows, summary = run_item(ctx, item, word_meta)
+        item_rows, item_top, summary = run_item(ctx, item, word_meta)
         rows += item_rows
+        top_rows += item_top
         summaries.append(summary)
         print(f"  {item['condition']:<10} {item['entity']:<13} -> {summary['generated']!r}")
 
     shard.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_parquet(shard, index=False)
+    pd.DataFrame(top_rows).to_parquet(top_path, index=False)
     pd.DataFrame(summaries).to_parquet(summary_path, index=False)
-    (shard.parent / "confidence_manifest.json").write_text(json.dumps(
-        {"spec": spec, "templates": TEMPLATES, "groups": GROUPS, "words": word_meta,
-         "config": config}, indent=2))
+    (shard.parent / f"confidence_{stimuli_set}_manifest.json").write_text(json.dumps(
+        {"spec": spec, "stimuli": sets[stimuli_set], "templates": TEMPLATES, "groups": GROUPS,
+         "words": word_meta, "config": config}, indent=2))
 
 
 # --- analysis -----------------------------------------------------------------
@@ -186,13 +209,34 @@ def by_layer(df: pd.DataFrame, summary: pd.DataFrame, k: int, *, rank_col: str =
     return present.groupby(["layer", "condition", "group"]).mean().unstack(["condition", "group"])
 
 
+def enriched(top: pd.DataFrame, ids_a: pd.Series, ids_b: pd.Series, *, layers: tuple[int, int],
+             lens: str = "jlens", n: int = 15) -> pd.DataFrame:
+    """Tokens in the top-k of more items of set A than of set B, over `layers`.
+
+    Exploratory: it shows what the lens holds without a word list. A token
+    counts once per item, lower-cased and stripped.
+    """
+    rows = top[(top["lens"] == lens) & top["layer"].between(layers[0], layers[1] - 1)]
+    rows = rows.assign(token=rows["token"].str.strip().str.lower())
+    seen = rows.drop_duplicates(["id", "token"])
+
+    def share(ids: pd.Series) -> pd.Series:
+        return seen[seen["id"].isin(ids)].groupby("token").size() / max(len(ids), 1)
+
+    out = pd.concat({"a": share(ids_a), "b": share(ids_b)}, axis=1).fillna(0.0)
+    out["diff"] = out["a"] - out["b"]
+    return out.sort_values("diff", ascending=False).head(n).rename_axis("token").reset_index()
+
+
 def report(spec: dict, config: dict, results_dir: Path) -> None:
     k, fmt = config["readout"]["primary_k"], dict(index=False, float_format="%.3f")
     lo, hi = config["confidence"]["early_fraction"]
     early = (int(lo * spec["n_layers"]), int(hi * spec["n_layers"]))
     windows = (("in-band", None), (f"early layers {early[0]}-{early[1] - 1}", early))
-    for limit, label in ((True, "SMOKE (--limit)"), (False, "FULL")):
-        shard, summary_path = _paths(spec["alias"], results_dir, limit)
+    runs = [(name, limit, f"{name} {kind}") for name in config["confidence"]["sets"]
+            for limit, kind in ((True, "SMOKE (--limit)"), (False, "FULL"))]
+    for stimuli_set, limit, label in runs:
+        shard, top_path, summary_path = _paths(spec["alias"], results_dir, stimuli_set, limit)
         if not shard.exists():
             continue
         df, summary = pd.read_parquet(shard), pd.read_parquet(summary_path)
@@ -205,5 +249,24 @@ def report(spec: dict, config: dict, results_dir: Path) -> None:
             print(f"\nconfidence {label} per layer [rank_wordlike, {lens}, k={k}]")
             print(by_layer(df, summary, k, lens=lens).to_string(float_format="%.3f"))
         print(f"\nconfidence {label} example outputs:")
-        for _, r in summary.groupby("condition").head(5).iterrows():
+        for _, r in summary.groupby(["condition", "output_type"]).head(4).iterrows():
             print(f"  {r.condition:<10} {r.entity:<13} -> {r.generated!r} ({r.output_type})")
+        if not top_path.exists():  # a run from before top tokens were stored
+            continue
+        top, band = pd.read_parquet(top_path), tuple(spec["band"])
+        ids = {key: g["id"] for key, g in summary.groupby(["condition", "output_type"])}
+        none = pd.Series(dtype=int)
+        contrasts = (
+            ("region: wrong name (a) vs correct (b)",
+             ids.get(("region", "guess"), none), ids.get(("region", "correct"), none)),
+            ("fictitious (a) vs real (b)",
+             summary[summary.condition == "fictitious"]["id"],
+             summary[summary.condition == "real"]["id"]),
+        )
+        for title, a, b in contrasts:
+            if not len(a) or not len(b):
+                continue
+            for name, layers in (("in-band", band), windows[1]):
+                print(f"\nconfidence {label} top tokens, {title} "
+                      f"[n={len(a)} vs {len(b)}, jlens, {name}]")
+                print(enriched(top, a, b, layers=layers).to_string(**fmt))
