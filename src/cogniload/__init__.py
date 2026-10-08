@@ -1,1 +1,1 @@
-"""SPAR: is the J-space a proxy for the task state a model maintains?"""
+"""SPAR: does the J-space carry a model's confidence in what it knows?"""

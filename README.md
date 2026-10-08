@@ -3,18 +3,20 @@
 Does the J-space encode the model's confidence: the boundary between what it
 knows and what it does not?
 
-This branch holds only the shared infrastructure for reading a prompt through
-the Jacobian lens and a logit-lens control. The keep-track experiments it was
-cut from (`single_cue`, `forced_demand`, `retro_cue`, `derived_state`), their
-specs and their findings are on `exp/aveizi/task-finding`.
+This branch holds the `confidence` experiment and the shared infrastructure
+for reading a prompt through the Jacobian lens and a logit-lens control. The
+keep-track experiments it was cut from (`single_cue`, `forced_demand`,
+`retro_cue`, `derived_state`), their specs and their findings are on
+`exp/aveizi/task-finding`.
 
-Why each measurement is the way it is: [`DECISIONS.md`](DECISIONS.md).
+Why each measurement is the way it is: [`DECISIONS.md`](DECISIONS.md). Results
+so far: [`FINDINGS.md`](FINDINGS.md).
 
 ## Setup
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[local]"   # torch, pandas, modal, pytest, jinja2; no transformers or jlens
+pip install -e ".[local]"   # torch, pandas, modal, pytest, jinja2, tokenizers; no transformers or jlens
 modal setup                 # once
 pytest -q                   # no GPU needed
 ```
@@ -65,15 +67,20 @@ python -m cogniload.cli report confidence --model dev                   # every 
 
 The report, in order:
 
-1. The fixed-list table, one row per condition and output type (`correct`,
-   `guess` = a name that is not the capital, `abstain`): `uncertain` and
-   `nonexistent` against `control`, in the band and then in an earlier window
-   (`confidence.early_fraction`). `out_*` is the share of items where a word of
-   that group is in the model's own top-k next tokens.
-2. A per-layer profile for each lens.
+1. The fixed-list table, one row per condition and output type: `correct`,
+   `guess` (another name, not the capital), `echo` (the entity's own name given
+   back) and `abstain`. Columns `uncertain` and `nonexistent` are read against
+   `control`; `answer` is the capital itself; `uncertain_any` is the share of
+   items with at least one uncertainty word; `out_*` is the share of items
+   where a word of that group is in the model's own top-k next tokens. Given in
+   the band and then in an earlier window (`confidence.early_fraction`).
+2. A per-layer profile for each lens, then a few example outputs.
 3. Top tokens: the tokens in the top 25 of more items of one set than another,
    for `region` wrong names against correct ones, and `fictitious` against
    `real`. This part is exploratory.
+
+Output types are worked out again from the stored text each time the report
+runs, so they follow the current rule in `confidence.output_type`.
 
 The comparison that matters is `region` / `guess` against `region` /
 `correct`: the output is a name in both, so a difference is not output staging.
@@ -81,12 +88,14 @@ The comparison that matters is `region` / `guess` against `region` /
 Outputs, under `results/<alias>/`, per set: `confidence_<set>.parquet` (fixed
 list: one row per word × layer × lens), `confidence_<set>_top.parquet` (top
 tokens per item, layer and lens), `confidence_<set>_summary.parquet` (one row
-per item: the model's output, its type and its probability) and
-`confidence_<set>_manifest.json`.
+per item: the model's output, its type and the probability of its first
+token) and `confidence_<set>_manifest.json`. A `--limit` run writes its own
+files, with `_limit` in each name.
 
 To rebuild a stimuli file, run the script beside it (`stimuli/capitals.py`,
 `stimuli/regions.py`). `regions.py` filters the committed Wikidata snapshot
-`stimuli/regions_wikidata.csv` and needs the `dev` tokenizer from the Hub.
+`stimuli/regions_wikidata.csv` and needs the `dev` tokenizer from the Hub
+(`tokenizers`, in the `[local]` extra).
 
 ### Adding an experiment
 
@@ -97,21 +106,24 @@ blocks are in `experiment.py`.
 ## Layout
 
 ```
+DECISIONS.md, FINDINGS.md why each choice was made; results so far
 configs/models.yaml       model + lens registry
 configs/experiments.yaml  settings; names an alias
 modal_app.py              runs one CLI stage on Modal
 stimuli/capitals.py       the item lists; writes capitals.csv
-stimuli/regions.py        filters the Wikidata snapshot; writes regions.csv
+stimuli/regions.py        filters regions_wikidata.csv; writes regions.csv
+tests/                    run without a GPU, on a fake model and lens
 src/cogniload/
   cli.py                  stage runner
-  confidence.py           confidence: prompt, run_item, table
-  experiment.py           shared blocks: layers, two-lens readout, scoring, generation
+  confidence.py           confidence: prompt, run_item, tables, report
+  experiment.py           shared blocks: layers, two-lens readout, generation
   find_band.py            band discovery
   prompts.py              chat rendering with the thinking assertion
   readout.py              lens ranks per word, layer and position
   registry.py, bands.py   alias -> spec; band.json
 ```
 
-Presence is band-min rank ≤ `readout.primary_k` (25). `rank` is over the full
-vocabulary; `rank_wordlike` over word-like tokens only, which is what
-Neuronpedia shows.
+Presence is band-min rank ≤ `readout.primary_k` (25). In the fixed-list files
+`rank` is over the full vocabulary and `rank_wordlike` over word-like tokens
+only, which is what Neuronpedia shows. In the top-token files `rank` is the
+position, 1 to 25, among word-like tokens.

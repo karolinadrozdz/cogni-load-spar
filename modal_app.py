@@ -4,7 +4,7 @@
     modal run modal_app.py --stage confidence --stimuli-set regions --model dev --limit 5
     modal run modal_app.py --stage report --experiment <experiment> --model prod
 
-Run from the repo root: the image picks up `src/` and `configs/` from there.
+Run from the repo root: the image picks up `src/`, `configs/` and `stimuli/` from there.
 Two volumes persist: an HF cache (the 54 GB prod download happens once) and
 the results.
 """

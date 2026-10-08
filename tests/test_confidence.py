@@ -61,10 +61,51 @@ def test_prompt_ends_in_thinking_off_plus_prefill(tok):
 @pytest.mark.parametrize("text,answer,expected", [
     (" Paris", "Paris", "correct"), (" paris.", "Paris", "correct"),
     (" Lyon", "Paris", "guess"), (" Lisbon", "", "guess"),
+    (" N'Djamena", "Bol", "guess"), (" N/A", "Bol", "abstain"),
+    (" I'm not sure", "Paris", "abstain"), (" There's no such country", "", "abstain"),
+    (" 'Paris'", "Paris", "correct"), ("\nRabaul\n", "Buka", "guess"),
     (" Unknown", "", "abstain"), (" I don't know", "Paris", "abstain"), ("", "", "abstain"),
 ])
 def test_output_type(text, answer, expected):
     assert confidence.output_type(text, answer) == expected
+
+
+@pytest.mark.parametrize("text,answer,entity,expected", [
+    (" Jufra", "Hun", "Jufra, Libya", "echo"),
+    (" New York City", "Albany", "New York, United States", "echo"),
+    (" Jorvan", "", "Jorvania", "echo"),
+    (" Kumasi", "Wa", "Upper West Region, Ghana", "guess"),
+    (" Accra", "Wa", "Upper West Region, Ghana", "guess"),  # the country is not the entity
+    (" La Paz", "Tela", "Atlantida, Honduras", "guess"),    # "la" is inside the name, not a word of it
+])
+def test_output_type_separates_an_echo_of_the_entity(text, answer, entity, expected):
+    assert confidence.output_type(text, answer, entity) == expected
+
+
+def test_table_values_on_hand_built_rows():
+    """Two items, band 23-26. Item 1 has "unknown" at rank 3 in layer 26 only; item 2 never."""
+    def rows(item, concept, group, ranks):
+        return [{"id": item, "group": group, "concept": concept, "word": concept, "lens": "jlens",
+                 "layer": layer, "in_band": 23 <= layer < 27, "rank": r, "rank_wordlike": r}
+                for layer, r in ranks.items()]
+    far = {layer: 900 for layer in (18, 22, 26, 27)}
+    df = pd.DataFrame(
+        rows(1, "unknown", "uncertain", {**far, 26: 3}) + rows(1, "maybe", "uncertain", far)
+        + rows(2, "unknown", "uncertain", {**far, 27: 1, 22: 1}) + rows(2, "maybe", "uncertain", far)
+        + [r for i in (1, 2) for g in ("nonexistent", "control") for r in rows(i, "x", g, far)])
+    summary = pd.DataFrame([
+        {"id": 1, "condition": "region", "output_type": "guess", "output_rank_uncertain": 25,
+         "output_rank_nonexistent": 26, "output_rank_control": 500},
+        {"id": 2, "condition": "region", "output_type": "correct", "output_rank_uncertain": 90,
+         "output_rank_nonexistent": 90, "output_rank_control": 500}])
+    t = confidence.table(df, summary, K).set_index("output_type")
+    # One of two uncertainty concepts present on item 1; layers 22 and 27 are outside the band.
+    assert t.loc["guess", "uncertain"] == 0.5 and t.loc["correct", "uncertain"] == 0.0
+    assert t.loc["guess", "uncertain_any"] == 1.0 and t.loc["correct", "uncertain_any"] == 0.0
+    assert t.loc["guess", "out_uncertain"] == 1.0 and t.loc["guess", "out_nonexistent"] == 0.0
+    # The half-open window (18, 23) holds layer 22 and not 26.
+    early = confidence.table(df, summary, K, layers=(18, 23)).set_index("output_type")
+    assert early.loc["guess", "uncertain"] == 0.0 and early.loc["correct", "uncertain"] == 0.5
 
 
 def test_runner_and_tables_on_a_fake_model(ctx, items):
@@ -122,6 +163,19 @@ def test_report_prints_windows_profiles_and_top_tokens(ctx, items, tmp_path, cap
     confidence.report(spec, CONFIG, tmp_path)
     printed = capsys.readouterr().out
     assert "in-band" in printed and "top tokens" not in printed
+
+
+def test_report_types_outputs_again_from_the_stored_text(ctx, items, tmp_path, capsys):
+    """A stored type from older code must not survive into the tables."""
+    df, top, summary = _run(ctx, _sample(items))
+    summary["generated"], summary["output_type"] = " None", "guess"
+    paths = confidence._paths("dev", tmp_path, "regions", True)
+    paths[0].parent.mkdir(parents=True)
+    for frame, path in zip((df, top, summary), paths):
+        frame.to_parquet(path, index=False)
+    confidence.report({**ctx.spec, "band": ctx.band}, CONFIG, tmp_path)
+    printed = capsys.readouterr().out
+    assert "regions SMOKE" in printed and "abstain" in printed and "guess" not in printed
 
 
 def test_cli_requires_a_stimuli_set_for_confidence_only(capsys):

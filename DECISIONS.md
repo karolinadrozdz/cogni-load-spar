@@ -2,10 +2,11 @@
 
 Open choices, each with what was decided, why, and what would reopen it.
 
-Only the entries that govern the shared infrastructure on this branch are kept,
-with their original numbers and text. Some still mention the keep-track
-experiments they were written for; those, and D2, D6, D7, D9, D15-D19 and
-D21-D23, are on `exp/aveizi/task-finding`.
+D1-D20 come from the keep-track experiments this branch was cut from. Only the
+entries that govern the shared infrastructure are kept, with their original
+numbers and text. Some still mention those experiments, a threshold sweep or
+exemplar lists that are not on this branch; those, and D2, D6, D7, D9, D15-D19
+and D21-D23, are on `exp/aveizi/task-finding`. D24 onward are this branch's own.
 
 ---
 
@@ -244,7 +245,8 @@ typing can be redone.
 about to say "Unknown"; it is then the next token. Only an invented country
 answered with a name separates held uncertainty from output staging.
 
-**Known limits:** invented names are 2-3 tokens where real ones are 1, so the
+**Known limits:** invented names are 2-3 tokens where real ones are mostly 1
+(44 of 50; the rest are 2), so the
 two conditions differ in form as well as in knowledge. The control words are
 common nouns, not frequency-matched to the uncertainty words. The invented
 names were not searched against real or fictional places.
@@ -268,12 +270,14 @@ readable in the keep-track runs (absent through L18). It was fixed after a
 their capitals, asked as "{region}, {country}" in the same template. They come
 from a Wikidata query (`stimuli/regions.py`, snapshot committed), filtered by
 rule: one capital, not a national capital, plain ASCII names, a one-word
-capital that is one token and does not appear in the region's name, at least
-20 Wikipedia language editions, and one region per capital. The number of
-editions (`links`) is kept as a measure of how well known the region is.
+capital that is one token, neither name contained in the other, no region with
+"City" in its name, nothing already used in the capitals set, at least 20
+Wikimedia pages on the region, and one region per capital. That page count
+(`links`: Wikipedia language editions and sister projects) is kept as a measure
+of how well known the region is.
 
 Alongside the fixed word list, the top 25 word-like tokens at each layer are
-stored for both lenses (`confidence_top.parquet`), and the report lists the
+stored for both lenses (`confidence_<set>_top.parquet`), and the report lists the
 tokens found in more items of one set than of another.
 
 **Why:** the first run had no confident wrong answers; the model never invents
@@ -292,7 +296,8 @@ again.
 
 **Known limits:** the set is every region that passes the rules, not a sample
 of obscure ones. Requiring a one-token capital removes most little-known
-regions (162 of 1,035 otherwise usable pass it), so about a quarter of the set
+regions (136 of the 943 that pass every other rule; 130 after keeping one per
+capital; median page count 120 against 55 for the rest), so about a quarter of the set
 is little known, and those capitals are often common words ("Salt", "Same", "Paradise"). An answer is scored against the Wikidata
 label only, so another name for the same city counts as wrong. The Wikidata
 entries were not checked one by one.

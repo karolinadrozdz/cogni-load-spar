@@ -1,4 +1,4 @@
-"""Blocks every experiment shares: layers, the two-lens readout, scoring and generation.
+"""Blocks every experiment shares: layers, the two-lens readout and generation.
 
 Task-independent on purpose: stimuli, the run loop and the tables belong to
 each experiment's own module.
@@ -52,25 +52,6 @@ def read_both(ctx: SimpleNamespace, text: str, meta: dict[str, dict], positions:
         rows += [{**r, **meta[r["word"]], "lens": lens_name, "readout_at": positions[r["token_pos"]],
                   "in_band": ctx.band[0] <= r["layer"] < ctx.band[1]} for r in result]
     return rows, model_logits
-
-
-def matches(a: str, b: str) -> bool:
-    """A decoded token has a leading space and may differ in case; neither is an error."""
-    return a.strip().casefold() == b.strip().casefold()
-
-
-def score_q1(tokenizer: Any, logits: torch.Tensor, expected: str) -> dict:
-    """Score the next token against `expected`.
-
-    `expected_rank` survives a formatting token winning the argmax, where
-    `correct` does not; `top5` tells a near miss from a total miss.
-    """
-    top = logits.topk(5)
-    decoded = [tokenizer.decode([i]) for i in top.indices.tolist()]
-    target = torch.tensor([readout.token_id(tokenizer, expected)])
-    return {"expected": expected, "answer": decoded[0], "correct": matches(decoded[0], expected),
-            "expected_rank": int(readout.rank_of(logits[None], target)[0, 0]),
-            "top5": " | ".join(f"{t}:{v:.2f}" for t, v in zip(decoded, top.values.tolist()))}
 
 
 @torch.no_grad()

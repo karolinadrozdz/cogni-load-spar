@@ -14,7 +14,7 @@ import torch
 
 
 def token_id(tokenizer: Any, word: str, prefix: str = " ") -> int:
-    """Id of `word` as it appears after ", ". Qwen digits have no spaced form; use prefix=""."""
+    """Id of `word` as it follows a space. A form with no leading space: prefix=""."""
     ids = tokenizer.encode(prefix + word, add_special_tokens=False)
     if len(ids) != 1:
         raise ValueError(f"{prefix + word!r} is {len(ids)} tokens, not 1")

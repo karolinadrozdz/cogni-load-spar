@@ -1,9 +1,9 @@
 [project]
 name = "cogniload"
 version = "0.1.0"
-description = "SPAR: is the J-space a proxy for the task state a model maintains?"
+description = "SPAR: does the J-space carry a model's confidence in what it knows?"
 requires-python = ">=3.11"
-# Core: enough to generate stimuli, read results, and run the tests. Everything
+# Core: enough to read results and run the tests. Everything
 # needed to *load a model* is in the `gpu` extra, so a laptop does not pull it.
 dependencies = [
     "torch>=2.5",
@@ -23,7 +23,8 @@ gpu = [
     "accelerate",  # device_map="auto"
 ]
 # On a laptop: launch Modal runs, run the tests, inspect downloaded parquet.
-local = ["modal>=1.0", "pytest>=8", "ruff>=0.6", "jinja2>=3"]
+# `tokenizers` is for stimuli/regions.py, which checks capitals are one token.
+local = ["modal>=1.0", "pytest>=8", "ruff>=0.6", "jinja2>=3", "tokenizers>=0.20"]
 
 [build-system]
 requires = ["setuptools>=68"]

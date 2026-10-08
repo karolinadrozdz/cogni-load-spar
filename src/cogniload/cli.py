@@ -34,6 +34,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, help="items per condition, for a smoke run")
     parser.add_argument("--force", action="store_true", help="redo outputs that exist")
     args = parser.parse_args(argv)
+    # Lens tokens are in many scripts; a Windows console code page cannot print them.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if (args.stage == "report") != bool(args.experiment):
         parser.error("name an experiment after `report`, and only there")
     if (args.stage == "confidence") != bool(args.stimuli_set):

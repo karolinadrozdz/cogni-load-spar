@@ -1,4 +1,5 @@
-"""Capital-city stimuli: 50 real countries and 50 invented ones.
+"""Capital-city stimuli: 50 real countries (three of them Britain, Scotland and
+Wales) and 50 invented ones.
 
 `stimuli/capitals.csv` with one row per item: `id`, `condition`
 (`real` | `fictitious`), `entity`, `answer` (empty for a fictitious entity,
@@ -13,8 +14,12 @@ from pathlib import Path
 OUT = Path(__file__).with_name("capitals.csv")
 
 #: Every capital is one token after a space on the Qwen tokenizer, so the
-#: answer is the next token after the prefill. Left out on purpose: countries
-#: with a contested or multi-word capital, and those named like their capital.
+#: answer is the next token after the prefill; checked by hand, not by this
+#: script. Left out on purpose: countries with a multi-word capital, and those
+#: whose capital has the same name (Singapore, Luxembourg). Kept although open
+#: to dispute: Tunisia (its name contains "Tunis"), and the Netherlands and
+#: Switzerland, whose seat of government or legal status differs from the
+#: conventional answer.
 REAL: list[tuple[str, str]] = [
     ("France", "Paris"), ("Japan", "Tokyo"), ("Germany", "Berlin"), ("Italy", "Rome"),
     ("Spain", "Madrid"), ("Russia", "Moscow"), ("China", "Beijing"), ("Egypt", "Cairo"),

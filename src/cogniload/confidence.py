@@ -42,9 +42,9 @@ GROUPS: dict[str, list[str]] = {
                 "music", "bridge", "letter", "winter", "market"],
 }
 #: First words of an answer that declines to name a capital.
-ABSTAIN = {"unknown", "none", "n", "na", "unsure", "uncertain", "sorry", "i", "no", "not",
-           "nothing", "there", "it", "this", "fictional", "fictitious", "nonexistent",
-           "invalid", "undefined"}
+ABSTAIN = {"unknown", "none", "unsure", "uncertain", "sorry", "i", "no", "not", "nothing",
+           "there", "it", "this", "fictional", "fictitious", "nonexistent", "invalid",
+           "undefined"}
 
 
 def load_items(path: Path) -> list[dict]:
@@ -76,12 +76,25 @@ def build(tokenizer: Any, entity: str, *, enable_thinking: bool) -> str:
                                enable_thinking=enable_thinking, prefill=prompts.PREFILL)
 
 
-def output_type(text: str, answer: str) -> str:
-    """`correct`, `abstain`, or `guess` (a committed answer that is not the capital)."""
-    first = re.findall(r"[A-Za-z]+", text)
-    if answer and first and experiment.matches(first[0], answer):
+def output_type(text: str, answer: str, entity: str = "") -> str:
+    """`correct`, `abstain`, `echo` (the entity's own name given back) or `guess`
+    (another name: a committed answer that is not the capital).
+
+    Judged on the first word. An apostrophe stays inside it, so "N'Djamena" is a
+    name, while "I'm" and "There's" abstain on the part before the apostrophe.
+    """
+    words = [w.strip("'") for w in re.findall(r"[A-Za-z']+", text)]
+    words = [w for w in words if w]
+    if not words or re.match(r"\s*n/?a\b", text, re.IGNORECASE):
+        return "abstain"
+    first = words[0].casefold()
+    if answer and first == answer.casefold():
         return "correct"
-    return "abstain" if not first or first[0].casefold() in ABSTAIN else "guess"
+    if first in ABSTAIN or first.split("'")[0] in ABSTAIN:
+        return "abstain"
+    # A word of the entity's name, whole or cut short ("Jorvan" for Jorvania).
+    name = re.findall(r"[a-z']+", entity.split(",")[0].casefold())
+    return "echo" if any(w.startswith(first) for w in name) else "guess"
 
 
 def run_item(ctx: SimpleNamespace, item: dict,
@@ -120,7 +133,7 @@ def run_item(ctx: SimpleNamespace, item: dict,
         # Rank of the capital in the model's own next-token distribution.
         "expected_rank": int(readout.rank_of(
             logits[None], torch.tensor([readout.token_id(tok, answer)]))[0, 0]) if answer else None,
-        "generated": generated, "output_type": output_type(generated, answer),
+        "generated": generated, "output_type": output_type(generated, answer, item["entity"]),
     }
     return rows, top_rows, summary
 
@@ -168,9 +181,10 @@ def run(spec: dict, config: dict, results_dir: Path, *, stimuli_set: str,
     pd.DataFrame(rows).to_parquet(shard, index=False)
     pd.DataFrame(top_rows).to_parquet(top_path, index=False)
     pd.DataFrame(summaries).to_parquet(summary_path, index=False)
-    (shard.parent / f"confidence_{stimuli_set}_manifest.json").write_text(json.dumps(
-        {"spec": spec, "stimuli": sets[stimuli_set], "templates": TEMPLATES, "groups": GROUPS,
-         "words": word_meta, "config": config}, indent=2))
+    manifest = shard.with_name(shard.stem + "_manifest.json")
+    manifest.write_text(json.dumps(
+        {"spec": spec, "stimuli": sets[stimuli_set], "limit": limit, "templates": TEMPLATES,
+         "groups": GROUPS, "words": word_meta, "config": config}, indent=2))
 
 
 # --- analysis -----------------------------------------------------------------
@@ -178,7 +192,7 @@ def run(spec: dict, config: dict, results_dir: Path, *, stimuli_set: str,
 
 def table(df: pd.DataFrame, summary: pd.DataFrame, k: int, *, rank_col: str = "rank_wordlike",
           lens: str = "jlens", layers: tuple[int, int] | None = None) -> pd.DataFrame:
-    """Per condition and output type: the share of each group's concepts present.
+    """Per condition and output type, the mean share of each group's concepts present.
 
     A concept is present if any of its forms has a minimum rank <= k over the
     band, or over the half-open layer range `layers` when that is given.
@@ -240,6 +254,9 @@ def report(spec: dict, config: dict, results_dir: Path) -> None:
         if not shard.exists():
             continue
         df, summary = pd.read_parquet(shard), pd.read_parquet(summary_path)
+        # Typed again from the stored text, so a change to `output_type` reaches old runs.
+        summary["output_type"] = [output_type(g, a, e) for g, a, e in
+                                  zip(summary["generated"], summary["answer"], summary["entity"])]
         for name, layers in windows:
             for rank_col, lens in VIEWS:
                 print(f"\nconfidence {label} [{rank_col}, {lens}, {name}, k={k}]")

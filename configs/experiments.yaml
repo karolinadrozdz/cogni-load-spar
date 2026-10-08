@@ -1,7 +1,6 @@
 # Every experiment's settings. `model` is a registry alias (configs/models.yaml);
 # override it per run with --model.
 model: dev
-seed: 0
 out_dir: results
 
 find_band:
@@ -13,7 +12,6 @@ find_band:
 
 readout:
   primary_k: 25                      # present = band-min rank <= k
-  k_values: [1, 5, 10, 25, 50]       # swept, so a result is not an artefact of k
   # Recorded around the band, to show whether presence peaks outside it.
   record_layer_fraction: [0.25, 0.85]
 

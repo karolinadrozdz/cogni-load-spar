@@ -2,11 +2,17 @@
 
 `stimuli/regions.csv` with one row per item: `id`, `condition` (`region`),
 `entity` ("Morelos, Mexico"), `answer` (the capital) and `links`, the number of
-Wikipedia language editions with an article on the region, as a measure of how
-well known it is.
+Wikimedia pages on the region (Wikipedia language editions and sister
+projects), as a measure of how well known it is.
 
-Built from `regions_wikidata.csv`, a snapshot of the query below, which is
-downloaded if the file is absent. Nothing here is written from memory.
+Built from `regions_wikidata.csv`, a snapshot of the query below; running this
+script downloads it if the file is absent. Nothing here is written from memory,
+and the entries were not checked against a second source.
+
+Kept: regions with exactly one capital that is not a national capital, at least
+`MIN_LINKS` links, plain ASCII names, a one-word capital that is one token on
+the `dev` tokenizer, neither name contained in the other, no region with "City"
+in its name, nothing already used in capitals.py, and one region per capital.
 """
 
 from __future__ import annotations
