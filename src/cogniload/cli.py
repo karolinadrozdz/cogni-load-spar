@@ -6,6 +6,7 @@
     python -m cogniload.cli retro_cue
     python -m cogniload.cli derived_state --arm derived|copyable
     python -m cogniload.cli state_tracking --arm derived|copyable
+    python -m cogniload.cli state_tracking_thinking [--cell K,H]
     python -m cogniload.cli hay_factorial
     python -m cogniload.cli hay_type --arm same|named|reworded
     python -m cogniload.cli report <experiment>
@@ -25,7 +26,8 @@ import yaml
 
 from cogniload import registry
 
-EXPERIMENTS = ["single_cue", "forced_demand", "retro_cue", "derived_state", "state_tracking"]
+EXPERIMENTS = ["single_cue", "forced_demand", "retro_cue", "derived_state", "state_tracking",
+               "state_tracking_thinking"]
 #: Stages in a shared module: stage -> the module with its `run_<stage>`, `report_<stage>`.
 SHARED = {"hay_factorial": "hay_load", "hay_type": "hay_load"}
 ARMS = {"derived_state": ["derived", "copyable"], "state_tracking": ["derived", "copyable"],
@@ -48,14 +50,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force", action="store_true", help="redo shards that exist")
     parser.add_argument("--top-tokens", type=int, metavar="N",
                         help="state_tracking: print top tokens for N items, write nothing")
+    parser.add_argument("--cell", type=lambda s: tuple(map(int, s.split(","))), metavar="K,H",
+                        help="state_tracking_thinking: run this (k, h) cell only")
     args = parser.parse_args(argv)
     if (args.stage == "report") != bool(args.experiment):
         parser.error("name an experiment after `report`, and only there")
-    if args.arm not in ARMS.get(args.stage, [None]):
-        parser.error(f"--arm for {args.stage} is one of {ARMS[args.stage]}" if args.stage in ARMS
-                     else f"--arm is only for {', '.join(ARMS)}")
+    if args.stage in ARMS and args.arm not in ARMS[args.stage]:
+        parser.error(f"--arm for {args.stage} is one of {ARMS[args.stage]}")
+    if args.stage not in ARMS and args.arm:
+        parser.error(f"--arm is only for {', '.join(ARMS)}")
     if args.top_tokens and args.stage != "state_tracking":
         parser.error("--top-tokens is only for state_tracking")
+    if args.cell and args.stage != "state_tracking_thinking":
+        parser.error("--cell is only for state_tracking_thinking")
 
     config = yaml.safe_load(Path(args.config).read_text())
     results = Path(args.out_dir or config["out_dir"])
@@ -70,11 +77,10 @@ def main(argv: list[str] | None = None) -> int:
     elif args.stage == "find_band":
         module.run(spec, config, results, force=args.force)
     else:
-        arm = {"arm": args.arm} if args.arm else {}
-        if args.top_tokens:
-            arm["top_tokens"] = args.top_tokens
+        options = {"arm": args.arm, "top_tokens": args.top_tokens, "cell": args.cell}
+        options = {key: value for key, value in options.items() if value}
         run = getattr(module, f"run_{args.stage}") if args.stage in SHARED else module.run
-        run(spec, config, results, limit=args.limit, force=args.force, **arm)
+        run(spec, config, results, limit=args.limit, force=args.force, **options)
     return 0
 
 

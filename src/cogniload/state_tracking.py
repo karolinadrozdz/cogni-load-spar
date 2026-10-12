@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 from cogniload import experiment, prompts, readout, registry
-from cogniload.experiment import VIEWS, presence, rate
+from cogniload.experiment import LENSES, VIEWS, presence, rate
 
 ARMS = ("derived", "copyable")
 N_PEOPLE = 3
@@ -52,19 +52,23 @@ LAST_UPDATE_COLUMNS = ["just_new", "poi_current", "other_current", "stale", "nam
 NEAR_FLOOR = 0.1
 KEYS = ["lens", "readout_at", "update", "arm", "k", "h", "item_id", "word", "role", "chain_j",
         "hay_matched", "correct", "emitted"]
+FMT = dict(index=False, float_format="%.3f")
+
+
+def is_one_token(tokenizer: Any, word: str) -> bool:
+    """Whether `word` after a space is a single token."""
+    try:
+        readout.token_id(tokenizer, word)
+    except ValueError:
+        return False
+    return True
 
 
 def pools(tokenizer: Any) -> tuple[list[str], list[str]]:
     """Names and objects that are one token after a space. No object inside another, so
     matching a decoded token to an object is unambiguous."""
-    def one_token(w):
-        try:
-            readout.token_id(tokenizer, w)
-        except ValueError:
-            return False
-        return True
-    names = [w for w in NAMES if one_token(w)]
-    objects = [w for w in OBJECTS if one_token(w)]
+    names = [w for w in NAMES if is_one_token(tokenizer, w)]
+    objects = [w for w in OBJECTS if is_one_token(tokenizer, w)]
     objects = [o for o in objects if not any(o != p and o in p for p in objects)]
     # 3 + k + h <= 18 objects per item, and at least 3 left for the floor.
     assert len(names) >= 6 and len(objects) >= 21, (names, objects)
@@ -72,7 +76,54 @@ def pools(tokenizer: Any) -> tuple[list[str], list[str]]:
 
 
 def hays(k: int) -> list[int]:
+    """The hay counts crossed with `k`."""
     return sorted({1, k, 2 * k})
+
+
+def grid(ks: list[int]) -> list[tuple[int, int]]:
+    """Every (k, h) cell."""
+    return [(k, h) for k in ks for h in hays(k)]
+
+
+def cell_tag(k: int, h: int) -> str:
+    """The shard name of cell (k, h)."""
+    return f"k{k}_h{h}"
+
+
+def base_templates(prefill: str) -> dict:
+    """The prompt templates every state_tracking variant records in its manifest."""
+    return {"initial": INITIAL, "update": UPDATE, "question": QUESTION, "prefill": prefill}
+
+
+def cast(rng: random.Random, names: list[str], objects: list[str], n_updates: int
+         ) -> tuple[list[str], list[str], str]:
+    """The item's people, its objects (initial ones first, then one per update) and its PoI."""
+    people = rng.sample(names, N_PEOPLE)
+    objs = rng.sample(objects, N_PEOPLE + n_updates)
+    poi = rng.choice(people)
+    return people, objs, poi
+
+
+def play_item(rng: random.Random, k: int, h: int, item_id: int, people: list[str],
+              objs: list[str], poi: str, needles: set[int], objects: list[str]) -> dict:
+    """The validated item whose update at each step in `needles` changes the PoI, and whose
+    other updates change someone else, drawn from `rng`."""
+    state = dict(zip(people, objs))
+    chains = {p: [o] for p, o in state.items()}
+    updates = []
+    for step, new in enumerate(objs[N_PEOPLE:]):
+        who = poi if step in needles else rng.choice([p for p in people if p != poi])
+        update = {"step": step, "is_needle": who == poi, "who": who, "cond": state[who],
+                  "new": new}
+        state[who] = new
+        chains[who].append(new)
+        update["state"] = dict(state)
+        updates.append(update)
+    item = {"k": k, "h": h, "item_id": item_id, "names": people, "poi": poi, "chains": chains,
+            "updates": updates, "last_is_needle": updates[-1]["is_needle"],
+            "floor": [o for o in objects if o not in objs]}
+    validate(item)
+    return item
 
 
 def make_items(k: int, h: int, n: int, names: list[str], objects: list[str]) -> list[dict]:
@@ -81,32 +132,20 @@ def make_items(k: int, h: int, n: int, names: list[str], objects: list[str]) -> 
     rng = random.Random(f"state_tracking-{k}-{h}")
     items = []
     for i in range(n):
-        people = rng.sample(names, N_PEOPLE)
-        objs = rng.sample(objects, N_PEOPLE + k + h)
-        poi = rng.choice(people)
+        people, objs, poi = cast(rng, names, objects, k + h)
         # Alternate items end in a hay, so "the last new object" is not a shortcut.
-        last_is_needle = i % 2 == 1
-        free = k + h - 1
-        needles = set(rng.sample(range(free), k - last_is_needle)) | ({free} if last_is_needle else set())
-        state = dict(zip(people, objs))
-        chains = {p: [o] for p, o in state.items()}
-        updates = []
-        for step, new in enumerate(objs[N_PEOPLE:]):
-            who = poi if step in needles else rng.choice([p for p in people if p != poi])
-            updates.append({"step": step, "is_needle": who == poi, "who": who,
-                            "cond": state[who], "new": new})
-            state[who] = new
-            chains[who].append(new)
-            updates[-1]["state"] = dict(state)
-        item = {"k": k, "h": h, "item_id": i, "names": people, "poi": poi, "chains": chains,
-                "updates": updates, "last_is_needle": last_is_needle,
-                "floor": [o for o in objects if o not in objs]}
-        validate(item)
-        items.append(item)
+        last_step = k + h - 1
+        if i % 2 == 1:
+            needles = set(rng.sample(range(last_step), k - 1)) | {last_step}
+        else:
+            needles = set(rng.sample(range(last_step), k))
+        items.append(play_item(rng, k, h, i, people, objs, poi, needles, objects))
     return items
 
 
 def validate(item: dict) -> None:
+    """Assert that objects are unique, the PoI's chain has k updates, each update changes
+    exactly its person, and there are h hays."""
     objs = [c[0] for c in item["chains"].values()] + [u["new"] for u in item["updates"]]
     assert len(set(objs)) == len(objs), "object reused"
     assert len(item["chains"][item["poi"]]) == item["k"] + 1, "PoI chain is not length k"
@@ -120,30 +159,39 @@ def validate(item: dict) -> None:
     assert item["last_is_needle"] == item["updates"][-1]["is_needle"]
 
 
+def update_sentence(update: dict, template: str, arm: str) -> str:
+    """One update in `template`, with the state after it appended in the copyable arm."""
+    state = ""
+    if arm == "copyable":
+        pairs = ", ".join(PAIR.format(name=p, obj=o) for p, o in update["state"].items())
+        state = STATE.format(pairs=pairs)
+    return template.format(cond=update["cond"], new=update["new"], who=update["who"],
+                           state=state)
+
+
 def build(tokenizer: Any, item: dict, arm: str, prefill: str, *,
           enable_thinking: bool) -> tuple[str, list[int]]:
     """The prompt, and the character offset of the period ending each update. Hays use
     `item["hay"]` if the item carries one (hay_type, through `run_item`), else `UPDATE`."""
-    first = [INITIAL.format(name=p, obj=item["chains"][p][0]) for p in item["names"]]
+    first = " ".join(INITIAL.format(name=p, obj=item["chains"][p][0]) for p in item["names"])
     hay = item.get("hay", UPDATE)
-    updates = [(UPDATE if u["is_needle"] else hay).format(
-        cond=u["cond"], new=u["new"], who=u["who"], state=STATE.format(pairs=", ".join(
-        PAIR.format(name=p, obj=o) for p, o in u["state"].items())) if arm == "copyable" else "")
-        for u in item["updates"]]
-    user = " ".join(first + updates + [QUESTION.format(poi=item["poi"])])
+    updates = [update_sentence(u, UPDATE if u["is_needle"] else hay, arm)
+               for u in item["updates"]]
+    user = " ".join([first, *updates, QUESTION.format(poi=item["poi"])])
     text = prompts.render_chat(tokenizer, user, enable_thinking=enable_thinking, prefill=prefill)
-    char, ends = text.index(user) + len(" ".join(first)), []
-    for s in updates:
-        char += 1 + len(s)
+    char, ends = text.index(user) + len(first), []
+    for sentence in updates:
+        char += 1 + len(sentence)
         ends.append(char - 1)
     return text, ends
 
 
 def period_tokens(tokenizer: Any, text: str, chars: list[int]) -> list[int]:
+    """Token index of the period at each character offset in `chars`."""
     enc = tokenizer(text, return_offsets_mapping=True, add_special_tokens=False)
     out = []
     for c in chars:
-        i = next(i for i, (a, b) in enumerate(enc["offset_mapping"]) if a <= c < b)
+        i = experiment.token_at(enc["offset_mapping"], c)
         token = tokenizer.decode([enc["input_ids"][i]])
         assert "." in token, f"expected a period at char {c}, got {token!r}"
         out.append(i)
@@ -167,8 +215,10 @@ def words_and_meta(item: dict, arm: str) -> dict[str, dict]:
     for p, chain in item["chains"].items():
         for i, o in enumerate(chain):
             j = len(chain) - 1 - i
-            role = ("target" if j == 0 else "chain") if p == poi else (
-                "other_current" if j == 0 else "other_stale")
+            if p == poi:
+                role = "target" if j == 0 else "chain"
+            else:
+                role = "other_current" if j == 0 else "other_stale"
             u = intro.get(o)
             meta[o] = {**base, "role": role, "person": p, "chain_j": j if p == poi else None,
                        "intro_step": u["step"] if u else None,
@@ -180,6 +230,7 @@ def words_and_meta(item: dict, arm: str) -> dict[str, dict]:
 
 
 def error_class(item: dict, answer: str) -> str:
+    """Which in-prompt object the answer is, by holder and how stale, or `out_of_prompt`."""
     for p, chain in item["chains"].items():
         for i, o in enumerate(chain):
             if experiment.matches(answer, o):
@@ -190,7 +241,15 @@ def error_class(item: dict, answer: str) -> str:
     return "out_of_prompt"
 
 
+def restricted_rank(tokenizer: Any, item: dict, logits) -> int:
+    """The target's rank among the item's in-prompt objects only."""
+    ids = [readout.token_id(tokenizer, o) for c in item["chains"].values() for o in c]
+    target = readout.token_id(tokenizer, item["chains"][item["poi"]][-1])
+    return int((logits[ids] > logits[target]).sum()) + 1
+
+
 def run_item(ctx, item: dict, arm: str) -> tuple[list[dict], dict]:
+    """Readout rows at the answer and each update's period, and the item's summary row."""
     tok = ctx.model.tokenizer
     text, ends = build(tok, item, arm, ctx.config["state_tracking"]["prefill"],
                        enable_thinking=ctx.spec["enable_thinking"])
@@ -201,7 +260,6 @@ def run_item(ctx, item: dict, arm: str) -> tuple[list[dict], dict]:
     # Behaviour is the readout pass's own logits at the answer, so no generation.
     logits, target = logits[-1], item["chains"][item["poi"]][-1]
     q1 = experiment.score_q1(tok, logits, target)
-    ids = [readout.token_id(tok, o) for c in item["chains"].values() for o in c]
     update_of = {t: u for u, t in enumerate(periods)}
     for r in rows:
         r |= {"update": update_of.get(r["token_pos"]), "correct": q1["correct"],
@@ -213,8 +271,7 @@ def run_item(ctx, item: dict, arm: str) -> tuple[list[dict], dict]:
         "updates": json.dumps(item["updates"]), "floor": json.dumps(item["floor"]),
         "answer_pos": answer, "period_pos": json.dumps(periods), "prompt": text,
         **q1, "error": error_class(item, q1["answer"]),
-        # Rank among the item's in-prompt objects only.
-        "restricted_rank": int((logits[ids] > logits[readout.token_id(tok, target)]).sum()) + 1,
+        "restricted_rank": restricted_rank(tok, item, logits),
     }
     return rows, summary
 
@@ -222,8 +279,9 @@ def run_item(ctx, item: dict, arm: str) -> tuple[list[dict], dict]:
 def _show(key: tuple[int, int], s: pd.DataFrame) -> None:
     if key == (2, 1):
         print(f"\n  --- k=2 h=1 first item prompt ---\n{s.iloc[0]['prompt']}\n  ---")
+    argmax = s["answer"].value_counts().head(5).to_dict()
     print(f"  k={key[0]} h={key[1]}: top-1 {s['correct'].mean():.0%}, restricted top-1 "
-          f"{(s['restricted_rank'] == 1).mean():.0%}; argmax {s['answer'].value_counts().head(5).to_dict()}")
+          f"{(s['restricted_rank'] == 1).mean():.0%}; argmax {argmax}")
 
 
 def instruction_words(prefill: str) -> set[str]:
@@ -233,6 +291,7 @@ def instruction_words(prefill: str) -> set[str]:
 
 
 def token_category(token: str, objects: list[str], names: list[str], instruction: set[str]) -> str:
+    """Which of CATEGORIES a decoded token falls in."""
     w = token.strip().casefold()
     if w in {o.casefold() for o in objects}:
         return "list_objects"
@@ -246,6 +305,32 @@ def token_category(token: str, objects: list[str], names: list[str], instruction
     return "other"
 
 
+def print_answer_top_tokens(model: Any, lens: Any, text: str, layers: list[int],
+                            answer: int) -> None:
+    """Print each lens's top tokens per layer at the answer, then the model's own."""
+    for lens_name, jacobian in LENSES:
+        tops, own = readout.top_tokens(model, lens, text, layers=layers, position=answer,
+                                       n=TOP_TOKENS_LENS, use_jacobian=jacobian)
+        for layer, words in tops.items():
+            print(f"  {lens_name} L{layer}: {words}")
+    top_ids = own.topk(TOP_TOKENS_MODEL).indices.tolist()
+    print(f"  model top {TOP_TOKENS_MODEL}: {[model.tokenizer.decode([i]) for i in top_ids]}")
+
+
+def top_tokens_by_category(model: Any, lens: Any, text: str, band: list[int], position: int,
+                           use_jacobian: bool, categorise, in_item: set[str]
+                           ) -> dict[str, list[str]]:
+    """The band-min top tokens at `position`, grouped by category; an object of this item
+    is starred."""
+    by = {c: [] for c in CATEGORIES}
+    for word, rank in readout.band_top_tokens(model, lens, text, layers=band, position=position,
+                                              n=TOP_TOKENS_BAND, use_jacobian=use_jacobian):
+        category = categorise(word)
+        star = "*" if category == "list_objects" and word.strip() in in_item else ""
+        by[category].append(f"{word!r}{star}({rank})")
+    return by
+
+
 def dump_top_tokens(spec: dict, config: dict, arm: str, n: int) -> None:
     """Print the top tokens at the answer, and band-min top tokens by category at the period
     ending the last update, for the first `n` items of one cell; no shards."""
@@ -255,34 +340,27 @@ def dump_top_tokens(spec: dict, config: dict, arm: str, n: int) -> None:
     model, lens = registry.load(spec)
     tok, prefill = model.tokenizer, config["state_tracking"]["prefill"]
     names, objects = pools(tok)
-    instruction, counts = instruction_words(prefill), {}
+    instruction = instruction_words(prefill)
+    categorise = lambda word: token_category(word, objects, names, instruction)
+    counts = {}
     for item in make_items(*TOP_TOKEN_CELL, n, names, objects):
         text, ends = build(tok, item, arm, prefill, enable_thinking=spec["enable_thinking"])
-        answer, last = model.encode(text).shape[-1] - 1, period_tokens(tok, text, ends)[-1]
+        answer = model.encode(text).shape[-1] - 1
+        last = period_tokens(tok, text, ends)[-1]
         in_item = {o for c in item["chains"].values() for o in c}
         print(f"\n{arm} k={item['k']} h={item['h']} item {item['item_id']}: PoI {item['poi']}, "
               f"chain {item['chains'][item['poi']]}")
-        for lens_name, jacobian in (("jlens", True), ("logit", False)):
-            tops, own = readout.top_tokens(model, lens, text, layers=layers, position=answer,
-                                           n=TOP_TOKENS_LENS, use_jacobian=jacobian)
-            for layer, words in tops.items():
-                print(f"  {lens_name} L{layer}: {words}")
-        print(f"  model top {TOP_TOKENS_MODEL}: "
-              f"{[tok.decode([i]) for i in own.topk(TOP_TOKENS_MODEL).indices.tolist()]}")
-        for lens_name, jacobian in (("jlens", True), ("logit", False)):
-            by = {c: [] for c in CATEGORIES}
-            for word, rank in readout.band_top_tokens(model, lens, text, layers=band,
-                                                      position=last, n=TOP_TOKENS_BAND,
-                                                      use_jacobian=jacobian):
-                category = token_category(word, objects, names, instruction)
-                star = "*" if category == "list_objects" and word.strip() in in_item else ""
-                by[category].append(f"{word!r}{star}({rank})")
+        print_answer_top_tokens(model, lens, text, layers, answer)
+        for lens_name, jacobian in LENSES:
+            by = top_tokens_by_category(model, lens, text, band, last, jacobian, categorise,
+                                        in_item)
             counts.setdefault(lens_name, Counter()).update({c: len(v) for c, v in by.items()})
             print(f"  {lens_name} last-update period, band-min top {TOP_TOKENS_BAND}: "
                   + " | ".join(f"{c}: {' '.join(v)}" for c, v in by.items() if v))
     for lens_name, c in counts.items():
+        per_category = {category: c[category] for category in CATEGORIES}
         print(f"\n{arm} {lens_name} last-update period, top {TOP_TOKENS_BAND} per category over "
-              f"{n} items: {dict((k, c[k]) for k in CATEGORIES)}")
+              f"{n} items: {per_category}")
 
 
 def run(spec: dict, config: dict, results_dir: Path, *, arm: str, limit: int | None = None,
@@ -290,16 +368,15 @@ def run(spec: dict, config: dict, results_dir: Path, *, arm: str, limit: int | N
     if top_tokens:
         return dump_top_tokens(spec, config, arm, top_tokens)
     settings = config["state_tracking"]
-    templates = {"initial": INITIAL, "update": UPDATE, "question": QUESTION,
-                 "prefill": settings["prefill"],
+    templates = {**base_templates(settings["prefill"]),
                  "state": STATE if arm == "copyable" else None, "pair": PAIR}
 
     def cells(ctx, n):
         names, objects = pools(ctx.model.tokenizer)
         # The manifest is written after the loop, so the filtered pools land in it.
         templates.update(names=names, objects=objects)
-        return [((k, h), f"k{k}_h{h}", make_items(k, h, n, names, objects))
-                for k in settings["ks"] for h in hays(k)]
+        return [((k, h), cell_tag(k, h), make_items(k, h, n, names, objects))
+                for k, h in grid(settings["ks"])]
 
     experiment.run(f"state_tracking_{arm}", settings, lambda ctx, item: run_item(ctx, item, arm),
                    templates, spec, config, results_dir, limit=limit, force=force, show=_show,
@@ -309,62 +386,73 @@ def run(spec: dict, config: dict, results_dir: Path, *, arm: str, limit: int | N
 # --- analysis -----------------------------------------------------------------
 
 
-def t1(s: pd.DataFrame) -> pd.DataFrame:
-    """Load: behaviour per arm x k x h, split by whether the last update is a needle."""
-    idx = [s.arm, s.k, s.h]
-    out = s.groupby(["arm", "k", "h"]).agg(
+def error_shares(s: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    """The share of items in each error class other than `target`, per `keys`."""
+    errors = pd.crosstab([s[c] for c in keys], s.error, normalize="index")
+    return errors.drop(columns="target", errors="ignore")
+
+
+def load_table(s: pd.DataFrame) -> pd.DataFrame:
+    """Behaviour per arm x k x h, split by whether the last update is a needle."""
+    keys = ["arm", "k", "h"]
+    out = s.groupby(keys).agg(
         n=("correct", "size"), top1=("correct", "mean"), med_rank=("expected_rank", "median"),
         med_rrank=("restricted_rank", "median"))
-    split = s.pivot_table(index=["arm", "k", "h"], columns="last_is_needle", values="correct",
+    split = s.pivot_table(index=keys, columns="last_is_needle", values="correct",
                           aggfunc="mean").rename(columns={False: "top1_hay_last",
                                                           True: "top1_needle_last"})
-    errors = pd.crosstab(idx, s.error, normalize="index").drop(columns="target", errors="ignore")
-    return out.join(split).join(errors).reset_index()
+    return out.join(split).join(error_shares(s, keys)).reset_index()
 
 
-def t2(p: pd.DataFrame, lens: str, by: tuple[str, ...] = ("arm", "k")) -> pd.DataFrame:
+def contents_row(g: pd.DataFrame, logit: pd.DataFrame) -> dict:
+    """Presence of each role in one group, J-lens `g` with the logit lens's `ll_` columns."""
+    k = g.k.iloc[0]
+    return {"n": (g.role == "target").sum(), "target": rate(g[g.role == "target"]),
+            **{f"chain_{j}": rate(g[g.chain_j == j]) for j in range(1, k + 1)},
+            **{r: rate(g[g.role == r]) for r in ("other_current", "other_stale")},
+            "hay_matched": rate(g[g.hay_matched]), "floor": rate(g[g.role == "floor"]),
+            "name_poi": rate(g[g.role == "name_poi"]),
+            "name_other": rate(g[g.role == "name_other"]), "emitted": rate(g[g.emitted]),
+            "ll_target": rate(logit[logit.role == "target"]),
+            "ll_chain_1": rate(logit[logit.chain_j == 1])}
+
+
+def answer_contents(p: pd.DataFrame, lens: str, by: tuple[str, ...] = ("arm", "k")
+                    ) -> pd.DataFrame:
     """Answer-position contents per `by` (default arm x k, pooled over h); `ll_*` are the
     logit lens."""
     main, ll = p[p.lens == lens], p[p.lens == "logit"]
     logit = dict(list(ll.groupby(list(by))))
-    out = []
-    for key, g in main.groupby(list(by)):
-        l, k = logit.get(key, ll[:0]), g.k.iloc[0]
-        out.append({**dict(zip(by, key)), "n": (g.role == "target").sum(),
-                    "target": rate(g[g.role == "target"]),
-                    **{f"chain_{j}": rate(g[g.chain_j == j]) for j in range(1, k + 1)},
-                    **{r: rate(g[g.role == r]) for r in ("other_current", "other_stale")},
-                    "hay_matched": rate(g[g.hay_matched]), "floor": rate(g[g.role == "floor"]),
-                    "name_poi": rate(g[g.role == "name_poi"]),
-                    "name_other": rate(g[g.role == "name_other"]), "emitted": rate(g[g.emitted]),
-                    "ll_target": rate(l[l.role == "target"]), "ll_chain_1": rate(l[l.chain_j == 1])})
-    df = pd.DataFrame(out)
+    df = pd.DataFrame([{**dict(zip(by, key)), **contents_row(g, logit.get(key, ll[:0]))}
+                       for key, g in main.groupby(list(by))])
     chains = sorted((c for c in df if c.startswith("chain_")), key=lambda c: int(c[6:]))
-    return df[[*by, "n", "target", *chains,
-               *[c for c in df if c not in chains and c not in (*by, "n", "target")]]]
+    rest = [c for c in df if c not in chains and c not in (*by, "n", "target")]
+    return df[[*by, "n", "target", *chains, *rest]]
 
 
-def t3(rows: pd.DataFrame, k_: int, rank_col: str, lens: str) -> pd.DataFrame:
+def chain_layer_order(rows: pd.DataFrame, present_k: int, rank_col: str,
+                      lens: str) -> pd.DataFrame:
     """Layer order of the chain, derived arm, k in {3, 4}, correct items. A chain object's
-    layer is its first band layer with rank <= k_, else the layer of its minimum rank."""
+    layer is its first band layer with rank <= present_k, else the layer of its minimum rank."""
     g = rows[rows.in_band & (rows.lens == lens) & (rows.arm == "derived") & rows.k.isin([3, 4])
              & rows.correct & rows.role.isin(["target", "chain"])]
     out = []
     for k, x in g.groupby("k"):
         keys = ["h", "item_id", "chain_j"]
-        legible = x[x[rank_col] <= k_].groupby(keys)["layer"].min()
+        legible = x[x[rank_col] <= present_k].groupby(keys)["layer"].min()
         best = x.loc[x.groupby(keys)[rank_col].idxmin()].set_index(keys)["layer"]
         # Columns from the initial object (j = k) to the target (j = 0).
-        L = legible.reindex(best.index).fillna(best).unstack("chain_j").sort_index(
+        layers = legible.reindex(best.index).fillna(best).unstack("chain_j").sort_index(
             axis=1, ascending=False)
-        steps = L.diff(axis=1).iloc[:, 1:]
-        out.append({"k": k, "n": len(L), **{f"layer_j{int(j)}": L[j].median() for j in L},
+        steps = layers.diff(axis=1).iloc[:, 1:]
+        out.append({"k": k, "n": len(layers),
+                    **{f"layer_j{int(j)}": layers[j].median() for j in layers},
                     "weak_monotone": (steps >= 0).all(axis=1).mean(),
                     "strict": (steps > 0).all(axis=1).mean(), "baseline": 1 / factorial(k)})
     return pd.DataFrame(out)
 
 
-def t4(p: pd.DataFrame, lens: str) -> pd.DataFrame:
+def wrong_vs_right(p: pd.DataFrame, lens: str) -> pd.DataFrame:
     """Derived arm, per k: wrong items beside correct ones. `fog` = in-prompt objects present."""
     g = p[(p.lens == lens) & (p.arm == "derived")]
     out = []
@@ -372,11 +460,11 @@ def t4(p: pd.DataFrame, lens: str) -> pd.DataFrame:
         row = {"k": k}
         for name, ok in (("wrong", False), ("right", True)):
             y = x[x.correct == ok]
+            in_prompt = y[y.role.isin(IN_PROMPT)].groupby(["h", "item_id"])["present"]
             row |= {f"n_{name}": (y.role == "target").sum(),
                     f"target_{name}": rate(y[y.role == "target"]),
                     f"emitted_{name}": rate(y[y.emitted]),
-                    f"fog_{name}": y[y.role.isin(IN_PROMPT)].groupby(["h", "item_id"])["present"]
-                    .sum().mean()}
+                    f"fog_{name}": in_prompt.sum().mean()}
         out.append(row)
     return pd.DataFrame(out)
 
@@ -416,6 +504,7 @@ def recency_regression(s: pd.DataFrame) -> pd.DataFrame:
 
 
 def with_hay_split(s: pd.DataFrame) -> pd.DataFrame:
+    """`s` with `pre_hays` and `tail_hays` columns from its stored updates."""
     split = s.updates.map(lambda u: hay_split(json.loads(u)))
     return s.assign(pre_hays=split.str[0], tail_hays=split.str[1])
 
@@ -430,23 +519,23 @@ def copyable_beside_derived(s: pd.DataFrame, p: pd.DataFrame) -> pd.DataFrame:
         "copyable_floor": copyable.apply(lambda g: rate(g[g.role == "floor"]))})).reset_index()
 
 
-def groups(p: pd.DataFrame) -> pd.DataFrame:
+def contents_by_correct(p: pd.DataFrame) -> pd.DataFrame:
     """Answer contents per arm x k x correct, J-lens with the logit lens (`_ll`) beside.
     `emitted` is NaN where the emitted token is not a read word."""
     by = ["arm", "k", "correct"]
-    j, ll = (t2(p, lens, tuple(by)) for lens in ("jlens", "logit"))
+    j, ll = (answer_contents(p, lens, tuple(by)) for lens in ("jlens", "logit"))
     cols = ["target", *[c for c in j if c.startswith("chain_")], "other_current", "other_stale",
             "name_poi", "name_other", "emitted", "floor"]
     both = j.merge(ll, on=[*by, "n"], suffixes=("", "_ll"))
     return both[[*by, "n", *[c for x in cols for c in (x, f"{x}_ll")]]]
 
 
-def band_best(p: pd.DataFrame, rank_col: str, k_: int) -> pd.DataFrame:
+def band_best(p: pd.DataFrame, rank_col: str, present_k: int) -> pd.DataFrame:
     """Per arm x k and lens: the median over items of the best band rank among every word read
-    (objects, floor, names), and the share of items where any of them is <= k_."""
+    (objects, floor, names), and the share of items where any of them is <= present_k."""
     best = p.groupby(["lens", "arm", "k", "h", "item_id"])[rank_col].min()
     out = best.groupby(["arm", "k", "lens"]).agg(
-        median_best="median", any_present=lambda r: (r <= k_).mean()).unstack("lens")
+        median_best="median", any_present=lambda r: (r <= present_k).mean()).unstack("lens")
     out.columns = [f"{c}_{lens}" for c, lens in out.columns]
     return out.reset_index()
 
@@ -482,77 +571,104 @@ def last_update(p: pd.DataFrame, s: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index()
 
 
-def recency_and_errors(s: pd.DataFrame, fmt: dict) -> None:
+def print_recency_and_errors(s: pd.DataFrame) -> None:
     """Recency split, the pre/tail-hay regression and error classes, derived arm."""
     d = with_hay_split(s[s.arm == "derived"])
-    print("\nstate_tracking A1 recency split per cell (derived)")
-    print(t1(d)[["k", "h", "n", "top1", "top1_needle_last", "top1_hay_last"]].to_string(**fmt))
-    print(f"\nstate_tracking A1 logistic regression correct ~ k + pre_hays + tail_hays "
+    print("\nstate_tracking recency split per cell (derived)")
+    print(load_table(d)[["k", "h", "n", "top1", "top1_needle_last", "top1_hay_last"]]
+          .to_string(**FMT))
+    print(f"\nstate_tracking logistic regression correct ~ k + pre_hays + tail_hays "
           f"(derived, n={len(d)})")
-    print(recency_regression(d).to_string(**fmt, formatters={"lr_p": "{:.2g}".format}))
-    print("\nstate_tracking A1 top-1 (n) by tail_hays (columns) at each k (derived)")
-    print(d.groupby(["k", "tail_hays"])["correct"].agg(lambda c: f"{c.mean():.2f} ({len(c)})")
+    print(recency_regression(d).to_string(**FMT, formatters={"lr_p": "{:.2g}".format}))
+    print("\nstate_tracking top-1 (n) by tail_hays (columns) at each k (derived)")
+    top1_and_n = lambda c: f"{c.mean():.2f} ({len(c)})"
+    print(d.groupby(["k", "tail_hays"])["correct"].agg(top1_and_n)
           .unstack("tail_hays", fill_value="").to_string())
     for by in ("k", "h"):
-        print(f"\nstate_tracking A2 error classes per {by} (derived; share of items)")
+        print(f"\nstate_tracking error classes per {by} (derived; share of items)")
         errors = pd.crosstab(d[by], d.error, normalize="index")
-        print(errors.join(d.groupby(by).size().rename("n")).reset_index().to_string(**fmt))
+        print(errors.join(d.groupby(by).size().rename("n")).reset_index().to_string(**FMT))
+
+
+def load_runs(alias: str, results_dir: Path) -> dict[str, tuple[pd.DataFrame, pd.DataFrame]]:
+    """Per run label, both arms' band rows at the answer and at the period ending the last
+    update, and their summaries."""
+    parts = {}
+    for arm in ARMS:
+        for label, df, s in experiment.runs(f"state_tracking_{arm}", alias, results_dir,
+                                            cell="k"):
+            keep = df.in_band & ((df.readout_at == "answer") | (df["update"] == df.k + df.h - 1))
+            parts.setdefault(label, []).append((df[keep], s))
+    return {label: (pd.concat([d for d, _ in x], ignore_index=True),
+                    pd.concat([s for _, s in x], ignore_index=True))
+            for label, x in parts.items()}
+
+
+def print_positive_control(label: str, rows: pd.DataFrame, s: pd.DataFrame, k: int) -> None:
+    """Top-1 by arm beside the copyable target's presence at the answer, with a loud warning
+    if that presence is near the floor."""
+    rank_col, lens = VIEWS[0]
+    p = presence(rows[rows.lens == lens], k, rank_col=rank_col, keys=KEYS)
+    print(f"\nstate_tracking {label} positive control: top-1 by arm; copyable target presence "
+          f"at the answer [{rank_col}, {lens}, in-band, k={k}]")
+    print(copyable_beside_derived(s, p).to_string(**FMT))
+    copyable = p[p.arm == "copyable"]
+    target = rate(copyable[copyable.role == "target"])
+    floor = rate(copyable[copyable.role == "floor"])
+    if target - floor < NEAR_FLOOR:
+        print(f"\n  !!! POSITIVE CONTROL FAILS: copyable target presence {target:.3f} is "
+              f"near the floor {floor:.3f}; the readout cannot see objects here !!!")
+
+
+def print_view_tables(label: str, rows: pd.DataFrame, s: pd.DataFrame, k: int,
+                      by_rank: dict[str, pd.DataFrame]) -> None:
+    """Answer contents, chain layer order and wrong vs right, for each of VIEWS."""
+    for rank_col, lens in VIEWS:
+        tag = f"[{rank_col}, {lens}, in-band, k={k}]"
+        p = by_rank[rank_col]
+        print(f"\nstate_tracking {label} T2 answer contents {tag}")
+        print(answer_contents(p, lens).to_string(**FMT))
+        if (s.arm == "derived").any():
+            print(f"\nstate_tracking {label} T3 chain layer order {tag}")
+            print(chain_layer_order(rows, k, rank_col, lens).to_string(**FMT))
+            print(f"\nstate_tracking {label} T4 wrong vs right {tag}")
+            print(wrong_vs_right(p, lens).to_string(**FMT))
+
+
+def print_full_tables(label: str, last: pd.DataFrame, s: pd.DataFrame, k: int,
+                      p: pd.DataFrame) -> None:
+    """The full run's extra tables: contents by correct, best band rank, and the period
+    ending the last update."""
+    rank_col = VIEWS[0][0]
+    tag = f"[{rank_col}, in-band, k={k}]"
+    print(f"\nstate_tracking {label} groups by arm x k x correct, J-lens with logit "
+          f"lens (_ll) {tag}")
+    print(contents_by_correct(p).to_string(**FMT))
+    print(f"\nstate_tracking {label} best band rank among all read words, per item {tag}")
+    print(band_best(p, rank_col, k).to_string(**FMT))
+    print(f"\nstate_tracking {label} period ending the last update, by arm x "
+          f"last_is_needle x correct, J-lens with logit lens (_ll) {tag}")
+    print(last_update(presence(last, k, rank_col=rank_col, keys=KEYS), s).to_string(**FMT))
 
 
 def report(spec: dict, config: dict, results_dir: Path) -> None:
-    k, fmt = config["readout"]["primary_k"], dict(index=False, float_format="%.3f")
-    data = {}
-    for arm in ARMS:
-        for label, df, s in experiment.runs(f"state_tracking_{arm}", spec["alias"], results_dir,
-                                            cell="k"):
-            # The tables read the band only: the answer, and the period ending the last update.
-            keep = df.in_band & ((df.readout_at == "answer") | (df["update"] == df.k + df.h - 1))
-            data.setdefault(label, []).append((df[keep], s))
-    for label, parts in data.items():
-        both = pd.concat([d for d, _ in parts], ignore_index=True)
+    k = config["readout"]["primary_k"]
+    for label, (both, s) in load_runs(spec["alias"], results_dir).items():
         rows, last = both[both.readout_at == "answer"], both[both.readout_at == "update"]
-        s = pd.concat([x for _, x in parts], ignore_index=True)
         print(f"\nstate_tracking {label}: T1 load (error columns: share of items)")
-        print(t1(s).to_string(**fmt))
+        print(load_table(s).to_string(**FMT))
         for arm, g in s.groupby("arm"):
             print(f"  {arm} argmax: {g['answer'].value_counts().head(8).to_dict()}")
         if set(ARMS) <= set(s.arm):
-            rank_col, lens = VIEWS[0]
-            p = presence(rows[rows.lens == lens], k, rank_col=rank_col, keys=KEYS)
-            control = copyable_beside_derived(s, p)
-            print(f"\nstate_tracking {label} B top-1 by arm; copyable target presence at the "
-                  f"answer [{rank_col}, {lens}, in-band, k={k}]")
-            print(control.to_string(**fmt))
-            target, floor = rate(p[(p.arm == "copyable") & (p.role == "target")]), rate(
-                p[(p.arm == "copyable") & (p.role == "floor")])
-            if target - floor < NEAR_FLOOR:
-                print(f"\n  !!! POSITIVE CONTROL FAILS: copyable target presence {target:.3f} is "
-                      f"near the floor {floor:.3f}; the readout cannot see objects here !!!")
+            print_positive_control(label, rows, s, k)
         else:
-            print(f"\nstate_tracking {label} B skipped: needs both arms, have {sorted(set(s.arm))}")
-        for rank_col, lens in VIEWS:
-            tag = f"[{rank_col}, {lens}, in-band, k={k}]"
-            p = presence(rows, k, rank_col=rank_col, keys=KEYS)
-            print(f"\nstate_tracking {label} T2 answer contents {tag}")
-            print(t2(p, lens).to_string(**fmt))
-            if (s.arm == "derived").any():
-                print(f"\nstate_tracking {label} T3 chain layer order {tag}")
-                print(t3(rows, k, rank_col, lens).to_string(**fmt))
-                print(f"\nstate_tracking {label} T4 wrong vs right {tag}")
-                print(t4(p, lens).to_string(**fmt))
+            print(f"\nstate_tracking {label} positive control skipped: needs both arms, have "
+                  f"{sorted(set(s.arm))}")
+        by_rank = {rank_col: presence(rows, k, rank_col=rank_col, keys=KEYS)
+                   for rank_col in {rank_col for rank_col, _ in VIEWS}}
+        print_view_tables(label, rows, s, k, by_rank)
         if label == "FULL":
-            rank_col, tag = VIEWS[0][0], f"[{VIEWS[0][0]}, in-band, k={k}]"
-            p = presence(rows, k, rank_col=rank_col, keys=KEYS)
-            print(f"\nstate_tracking {label} groups by arm x k x correct, J-lens with logit "
-                  f"lens (_ll) {tag}")
-            print(groups(p).to_string(**fmt))
-            print(f"\nstate_tracking {label} best band rank among all read words, per item "
-                  f"{tag}")
-            print(band_best(p, rank_col, k).to_string(**fmt))
-            print(f"\nstate_tracking {label} period ending the last update, by arm x "
-                  f"last_is_needle x correct, J-lens with logit lens (_ll) {tag}")
-            print(last_update(presence(last, k, rank_col=rank_col, keys=KEYS), s)
-                  .to_string(**fmt))
-        # The regression needs the full grid.
-        if label == "FULL" and (s.arm == "derived").any():
-            recency_and_errors(s, fmt)
+            print_full_tables(label, last, s, k, by_rank[VIEWS[0][0]])
+            # The regression needs the full grid.
+            if (s.arm == "derived").any():
+                print_recency_and_errors(s)

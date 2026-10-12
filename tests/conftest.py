@@ -52,15 +52,16 @@ class Model:
         self._hf_model = types.SimpleNamespace(generate=lambda ids, max_new_tokens, **kw: torch.cat(
             [ids, torch.ones(1, max_new_tokens, dtype=torch.long)], dim=1))
 
-    def encode(self, text):
-        return torch.tensor([self.tokenizer.encode(text)])
+    # Truncates at 512 by default, as jlens's encode does.
+    def encode(self, text, max_length=512):
+        return torch.tensor([self.tokenizer.encode(text)[:max_length]])
 
 
 class Lens:
-    def apply(self, model, prompt, *, layers, positions, use_jacobian):
+    def apply(self, model, prompt, *, layers, positions, use_jacobian, max_seq_len=512):
         n = len(positions)
         return ({l: torch.randn(n, VOCAB) for l in layers}, torch.randn(n, VOCAB),
-                model.encode(prompt))
+                model.encode(prompt, max_length=max_seq_len))
 
 
 @pytest.fixture

@@ -563,3 +563,95 @@ Outcome: the band at the answer position holds task-level concepts (the swap ope
 | derived | yes | ✓ | 153 | 0.026 / 0.020 | — | 0.000 / 0.007 | 0.004 / 0.018 | 0.000 / 0.000 | 0.004 / 0.018 |
 
 Outcome: every group is at floor in both arms and both lenses, including the object written one token earlier (≤ 0.067); as in derived_state, the in-stream readout fails its own positive control, so no state claim is possible at this position. Pending: the top-25 band tokens here, by category.
+
+---
+
+## 10. state_tracking_thinking (`prod`, Qwen3.6-27B, thinking on)
+
+Same 420 derived items as §9 (14 cells × 30), thinking on, sampled (T 0.6 /
+top-p 0.95 / top-k 20, seeded per item), budget 4,096 reasoning tokens, then
+`</think>\n\nAnswer:` scored as in §9. 418 of 420 traces closed (2 at budget,
+both `k5_h10`). `correct_prefix` also counts an argmax that is the first
+sub-token of a target whose capitalised form is not one token (`sock`, `vase`,
+`kite`): all 7 strict "errors" with thinking on are this (the trace ends
+"Final Answer: Vase", the argmax is ` V`), and 1 thinking-off item (`k2_h1`
+item 23, ` K` for `kite`), so §9's `k = 2, h = 1` derived top-1 is 0.500, not 0.467.
+Band-min presence pools both case forms here, so it is not comparable to §9.
+
+### Behaviour, paired on the same items (`correct_prefix`; strict beside)
+
+| k | h | top-1 on (strict) | top-1 off (strict) | right only on | right only off | McNemar p |
+|---|---|---|---|---|---|---|
+| 1 | 1 | 1.000 (0.933) | 1.000 | 0 | 0 | 1 |
+| 1 | 2 | 1.000 | 0.933 | 2 | 0 | 0.5 |
+| 2 | 1 | 1.000 | 0.500 (0.467) | 15 | 0 | 6.1e-05 |
+| 2 | 2 | 1.000 (0.933) | 0.667 | 10 | 0 | 0.002 |
+| 2 | 4 | 1.000 | 0.533 | 14 | 0 | 1.2e-04 |
+| 3 | 1 | 1.000 | 0.700 | 9 | 0 | 0.0039 |
+| 3 | 3 | 1.000 | 0.400 | 18 | 0 | 7.6e-06 |
+| 3 | 6 | 1.000 (0.967) | 0.333 | 20 | 0 | 1.9e-06 |
+| 4 | 1 | 1.000 (0.967) | 0.667 | 10 | 0 | 0.002 |
+| 4 | 4 | 1.000 | 0.333 | 20 | 0 | 1.9e-06 |
+| 4 | 8 | 1.000 | 0.100 | 27 | 0 | 1.5e-08 |
+| 5 | 1 | 1.000 | 0.767 | 7 | 0 | 0.016 |
+| 5 | 5 | 1.000 | 0.533 | 14 | 0 | 1.2e-04 |
+| 5 | 10 | 1.000 (0.967) | 0.167 | 25 | 0 | 6e-08 |
+| **all** | | **1.000 (0.983)** | **0.545 (0.543)** | **191** | **0** | **6.4e-58** |
+| hay last | | 1.000 (0.976) | 0.357 | 135 | 0 | 4.6e-41 |
+
+Outcome: reasoning removes the load entirely — 420/420 against 54.5% on the same items. Every trace writes the state out (lines such as "Current State: Dan (Vase), Ben (Chain), Kim (Sock)", median ≈ 1.1 per update), turning the derived task into the copyable one, which was at ceiling without thinking (§9 B).
+
+
+### Reasoning length as a load index
+
+| k | h | median tokens (IQR) | median sentences | median object mentions |
+|---|---|---|---|---|
+| 1 | 1 | 726 (383) | 80 | 62 |
+| 1 | 2 | 787 (232) | 85 | 69 |
+| 2 | 1 | 862 (154) | 94 | 78 |
+| 2 | 2 | 972 (299) | 101 | 91 |
+| 2 | 4 | 1,076 (317) | 114 | 114 |
+| 3 | 1 | 1,020 (190) | 106 | 103 |
+| 3 | 3 | 1,154 (220) | 119 | 128 |
+| 3 | 6 | 1,475 (336) | 152 | 170 |
+| 4 | 1 | 1,070 (162) | 107 | 110 |
+| 4 | 4 | 1,350 (323) | 145 | 157 |
+| 4 | 8 | 1,566 (457) | 163 | 196 |
+| 5 | 1 | 1,187 (277) | 122 | 131 |
+| 5 | 5 | 1,463 (342) | 155 | 178 |
+| 5 | 10 | 1,704 (601) | 171 | 201 |
+
+OLS `n_reasoning_tokens ~ k + pre_hays + tail_hays` (n = 420): intercept 542 (se 38), k 122 (12), pre_hays 75 (6), tail_hays 56 (15); closed traces only (n = 418): 560 / 120 / 65 / 61. Spearman, per-cell median tokens vs thinking-off top-1, 14 cells: −0.79.
+
+Outcome: trace length rises with every term and orders the cells the way thinking-off accuracy does, so it measures the load where accuracy is at ceiling.
+
+
+### J-space at the token before each object the trace writes (unquoted mentions; J-lens / logit lens, in-band, `rank_wordlike` ≤ 25)
+
+`quoted` = the 40 characters before the mention contain "holding the" / "swaps it for the" / "holds the" (copying an update sentence). Control = the most recent different object written earlier, at the same position.
+
+| k | n | about-to-be-written | control | floor | PoI chain | other people | PoI final |
+|---|---|---|---|---|---|---|---|
+| 1 | 2,295 | 0.070 / 0.026 | 0.002 / 0.000 | 0.002 | 0.069 | 0.108 | 0.034 |
+| 2 | 4,831 | 0.127 / 0.058 | 0.009 / 0.005 | 0.004 | 0.127 | 0.148 | 0.091 |
+| 3 | 4,691 | 0.123 / 0.071 | 0.011 / 0.006 | 0.007 | 0.120 | 0.132 | 0.088 |
+| 4 | 4,882 | 0.145 / 0.091 | 0.016 / 0.010 | 0.009 | 0.171 | 0.151 | 0.073 |
+| 5 | 4,732 | 0.165 / 0.107 | 0.021 / 0.012 | 0.010 | 0.184 | 0.173 | 0.077 |
+
+Pooled: unquoted 0.132 / 0.076 vs control 0.013 (n = 21,431); quoted 0.060 / 0.036 vs 0.011 (n = 13,767). Pool words written as ordinary prose (`chain` 202, `stick` 28, `key` 10, `map` 9; never in the prompt): 0.61 J-lens / 0.99 logit lens.
+
+Outcome: in the trace the readout passes its positive control for derived writes and the J-lens beats the logit lens about 2×, rising with k; for predictable prose the logit lens wins. The final answer object, when written in the trace, is the least visible.
+
+
+### Answer position and sentence ends
+
+Target present at the answer position: 0.02–0.10 on correct items at every k, both lenses; every other group 0.000. At reasoning sentence ends, the target is ≤ 0.006 and any in-prompt object ≤ 0.037 (J-lens) in every progress quintile.
+
+Outcome: as in §9, neither the answer slot nor sentence ends hold the state; with thinking on the state lives on the page.
+
+### State claims in the trace (rule-based extractor; sample of 20 items checked by hand)
+
+About 13,000 explicit holder claims ("Ben holds the bell", "Ben: bell", "Sam=drum"): every one is the name's final object or one it held at some step; **0** claims assign a name an object it never held. Every item has claims.
+
+Outcome: the trace's state is always faithful to the truth in this grid, so the faithful-but-wrong vs unfaithful split has no errors to work on at 27B.
+

@@ -37,32 +37,62 @@ def rank_of(logits: torch.Tensor, target_ids: torch.Tensor, *,
     return out + 1
 
 
+JLENS_MAX_SEQ_LEN = 512
+
+
+def check_positions(model: Any, prompt: str, positions: Sequence[int],
+                    max_seq_len: int | None) -> None:
+    """Raise if jlens would cut the prompt, or a position is past the prompt it reads."""
+    length = {"max_length": max_seq_len} if max_seq_len else {}
+    n = model.encode(prompt, **length).shape[-1]
+    # A prompt cut at the limit would make "the last token" silently mean the 512th.
+    if n >= (max_seq_len or JLENS_MAX_SEQ_LEN):
+        full = len(model.tokenizer(prompt, add_special_tokens=False)["input_ids"])
+        if full > n:
+            raise ValueError(f"prompt is longer than the {n}-token lens limit; pass max_seq_len")
+    # An index past the sequence is a device-side assert on GPU.
+    outside = sorted(p for p in positions if not -n <= p < n)
+    if outside:
+        raise ValueError(f"positions {outside} are outside the {n}-token encoded prompt "
+                         f"(jlens truncates at max_seq_len, 512 by default)")
+
+
 def read(model: Any, lens: Any, prompt: str, words: Sequence[str], token_ids: Sequence[int],
          *, layers: Sequence[int], positions: Sequence[int], use_jacobian: bool = True,
-         ) -> tuple[list[dict], torch.Tensor]:
+         max_seq_len: int | None = None) -> tuple[list[dict], torch.Tensor]:
     """One forward pass: a row per (word, layer, position), and the model's own logits there.
 
     `use_jacobian=False` is the logit-lens control: the same readout with `J_l`
-    replaced by the identity.
+    replaced by the identity. `max_seq_len` overrides jlens's truncation of the
+    prompt (512 tokens by default).
     """
     # Imported here so the module loads, and tests run, without jlens.
     from jlens.vis import _meaningful_token_mask
 
+    check_positions(model, prompt, positions, max_seq_len)
+    length = {"max_seq_len": max_seq_len} if max_seq_len else {}
     lens_logits, model_logits, input_ids = lens.apply(
-        model, prompt, layers=list(layers), positions=list(positions), use_jacobian=use_jacobian)
+        model, prompt, layers=list(layers), positions=list(positions), use_jacobian=use_jacobian,
+        **length)
     # Absolute indices, so `token_pos` means the same thing across calls.
     n = input_ids.shape[-1]
     positions = [p if p >= 0 else n + p for p in positions]
-    first = lens_logits[min(lens_logits)]
-    targets = torch.as_tensor(list(token_ids), dtype=torch.long, device=first.device)
-    wordlike = _meaningful_token_mask(model.tokenizer, first.shape[-1], first.device)
+    vocab = lens_logits[min(lens_logits)].shape[-1]
+    if max(token_ids) >= vocab:
+        raise ValueError(f"token ids {sorted(i for i in token_ids if i >= vocab)} are "
+                         f"outside the {vocab}-row unembedding")
+    # lens.apply returns CPU logits; ranking on the GPU is the same integer count, much faster.
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    targets = torch.as_tensor(list(token_ids), dtype=torch.long, device=device)
+    wordlike = _meaningful_token_mask(model.tokenizer, vocab, device)
     if not wordlike[targets].all():
         raise ValueError("some target tokens are not word-like; rank_wordlike would be meaningless")
 
     rows = []
     for layer in sorted(lens_logits):
-        logits = lens_logits[layer]
-        rank, rank_w = rank_of(logits, targets), rank_of(logits, targets, among=wordlike)
+        logits = lens_logits[layer].to(device)
+        rank = rank_of(logits, targets).cpu()
+        rank_w = rank_of(logits, targets, among=wordlike).cpu()
         rows += [{"word": w, "layer": layer, "token_pos": p,
                   "rank": int(rank[pi, i]), "rank_wordlike": int(rank_w[pi, i])}
                  for i, w in enumerate(words) for pi, p in enumerate(positions)]
@@ -88,10 +118,11 @@ def top_tokens(model: Any, lens: Any, prompt: str, *, layers: Sequence[int], pos
     own logits there."""
     lens_logits, model_logits, wordlike = _lens_at(model, lens, prompt, layers, position,
                                                    use_jacobian)
-    top = {layer: logits.masked_fill(~wordlike, float("-inf")).topk(n).indices.tolist()
-           for layer, logits in sorted(lens_logits.items())}
-    return ({layer: [model.tokenizer.decode([i]) for i in ids] for layer, ids in top.items()},
-            model_logits)
+    decoded = {}
+    for layer, logits in sorted(lens_logits.items()):
+        ids = logits.masked_fill(~wordlike, float("-inf")).topk(n).indices.tolist()
+        decoded[layer] = [model.tokenizer.decode([i]) for i in ids]
+    return decoded, model_logits
 
 
 def band_top_tokens(model: Any, lens: Any, prompt: str, *, layers: Sequence[int],
@@ -101,7 +132,9 @@ def band_top_tokens(model: Any, lens: Any, prompt: str, *, layers: Sequence[int]
     lens_logits, _, wordlike = _lens_at(model, lens, prompt, layers, position, use_jacobian)
     best = None
     for logits in lens_logits.values():
-        rank = logits.masked_fill(~wordlike, float("-inf")).argsort(descending=True).argsort() + 1
+        order = logits.masked_fill(~wordlike, float("-inf")).argsort(descending=True)
+        # Inverting the sort order gives each token's 0-indexed rank.
+        rank = order.argsort() + 1
         best = rank if best is None else torch.minimum(best, rank)
     ids = best.topk(n, largest=False).indices.tolist()
     return [(model.tokenizer.decode([i]), int(best[i])) for i in ids]

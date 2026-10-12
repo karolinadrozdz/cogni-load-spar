@@ -172,6 +172,31 @@ the readout fails its positive control. T3 (derived, `k` 3-4, correct items):
 median first legible layer per chain object and the share in chain order, vs
 `baseline`. T4 (derived): wrong items beside correct ones.
 
+### state_tracking_thinking
+
+state_tracking's derived items, same prompts, with thinking on: the model
+reasons (sampled, up to `max_thinking_tokens`), then `</think>\n\nAnswer:` is
+appended and one pass reads the full text. Read at the answer (all recorded
+layers), and in the band at reasoning sentence ends (`sentence`) and the token
+before each object mention (`prewrite`, flagged `quoted` when it copies an
+update sentence). Objects are read in both case forms. `--cell K,H` runs one
+cell.
+
+```bash
+modal run modal_app.py --stage state_tracking_thinking --model dev --limit 3
+modal run modal_app.py --stage state_tracking_thinking --model prod --limit 3 --cell 5,10
+modal run modal_app.py --stage state_tracking_thinking --model prod
+modal run modal_app.py --stage report --experiment state_tracking_thinking --model prod
+```
+
+Before the sweep, the `--cell 5,10` run must show closed ≥ 0.8, an argmax that
+is a pool object and the peak RSS (D33). Read T1 first: `top1` per `k`, `h` and
+`closed` against `top1_off` (thinking off, same items), and `retok_match`.
+Then the answer table by `closed`, the pre-write table by `quoted` (the
+next-written object against the control and `floor`; a `POSITIVE CONTROL
+FAILS` line means the readout cannot see the next object), and sentence ends
+by reasoning-progress quintile.
+
 ### hay_factorial
 
 state_tracking's derived arm with the hays untied from the chain: `k` in {1,
@@ -217,6 +242,7 @@ Under `results/<alias>/`, or the `cogniload-results` Modal volume at
 
 derived_state names carry the arm: `derived_state_copyable_ct2.parquet`.
 state_tracking shards are per cell, with the arm: `state_tracking_derived_k3_h6.parquet`.
+state_tracking_thinking shards are per cell: `state_tracking_thinking_k3_h6.parquet`.
 hay_factorial shards are per cell (`hay_factorial_k3_h4.parquet`); hay_type's carry
 the arm (`hay_type_named_k3_h6.parquet`).
 
@@ -240,6 +266,7 @@ src/cogniload/
   retro_cue.py            retro_cue: same shape
   derived_state.py        derived_state: same shape, plus the arm
   state_tracking.py       state_tracking: its own items (no streams), the arm, tables
+  state_tracking_thinking.py  state_tracking's derived items with thinking on
   hay_load.py             hay_factorial and hay_type: state_tracking items with the hays varied
   prompts.py              shared templates; chat rendering with the thinking assertion
   readout.py              lens ranks per word, layer and position

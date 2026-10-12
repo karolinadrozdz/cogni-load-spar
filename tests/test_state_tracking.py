@@ -47,18 +47,18 @@ def test_run_item_and_tables_on_a_fake_model(ctx):
     rows, summ = pd.DataFrame(rows), pd.DataFrame(summ)
     # Force some correct items so T3 has data.
     rows.loc[rows.item_id == 0, "correct"] = True
-    assert len(st.t1(summ)) == 6
+    assert len(st.load_table(summ)) == 6
     ans = rows[rows.readout_at == "answer"]
     p = experiment.presence(ans, K, rank_col="rank_wordlike", keys=st.KEYS)
-    t2 = st.t2(p, "jlens")
-    assert len(t2) == 6 and t2["chain_4"].notna().sum() == 2
-    assert len(st.t3(ans, K, "rank_wordlike", "jlens")) == 2
-    assert len(st.t4(p, "jlens")) == 3
+    contents_table = st.answer_contents(p, "jlens")
+    assert len(contents_table) == 6 and contents_table["chain_4"].notna().sum() == 2
+    assert len(st.chain_layer_order(ans, K, "rank_wordlike", "jlens")) == 2
+    assert len(st.wrong_vs_right(p, "jlens")) == 3
     control = st.copyable_beside_derived(summ, p)
     assert len(control) == 3
     assert {"top1_derived", "top1_copyable", "copyable_target"} <= set(control)
-    groups = st.groups(p)
-    assert set(groups.correct) == {True, False} and {"emitted_ll", "chain_4_ll"} <= set(groups)
+    contents = st.contents_by_correct(p)
+    assert set(contents.correct) == {True, False} and {"emitted_ll", "chain_4_ll"} <= set(contents)
     best = st.band_best(p, "rank_wordlike", K)
     assert len(best) == 6 and {"median_best_jlens", "any_present_logit"} <= set(best)
 

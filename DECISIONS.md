@@ -572,3 +572,81 @@ offsets and scoring are reused unchanged; without the key `build` is
 byte-identical to before. `same` renders exactly state_tracking's derived
 prompt. The reference for every arm is hay_factorial's `k = 3, h = 0` cell.
 Shards: `hay_type_<arm>_k3_h6[_limit].parquet`.
+
+## D32 — state_tracking_thinking: thinking on, an exception to D4
+
+**Why:** the question is whether reasoning removes state_tracking's load and
+what the J-space holds while the model writes its state out, so thinking has
+to be on, and on the same items, or the comparison with thinking off would mix
+items with condition.
+
+**Decided:** `st.build(..., enable_thinking=True)`, so the prompt ends
+`<think>\n` and `render_chat` asserts it. `run` passes
+`{**spec, "enable_thinking": True}`; the manifest records that and
+`registry_enable_thinking: false`. Items, prompt and question are
+state_tracking's derived arm, seeded per cell, so `top1_off` joins on
+`(k, h, item_id)`. `--cell K,H` runs one cell under its usual shard name.
+
+## D33 — state_tracking_thinking: sampling, the forced close, the closure gate
+
+**Why:** greedy decoding loops in thinking mode, so the trace is sampled with
+Qwen's settings and seeded per item. A trace cut at the budget answers
+mid-reasoning, which is a different condition, so it is flagged and kept apart.
+
+**Decided:** temperature 0.6, top_p 0.95, top_k 20;
+`torch.manual_seed(crc32("state_tracking_thinking-{k}-{h}-{item_id}"))`;
+generation stops at the `</think>` token only; budget `max_thinking_tokens`
+(1024). An unclosed trace gets `\n</think>` appended and `closed=False`; then
+`\n\nAnswer:`, and behaviour is the readout pass's argmax at `:` as in D26.
+The trace is stored verbatim; `retok_match` says whether re-encoding it gives
+the sampled ids. `closed` is on every row, and T1 and the answer table split by
+it. bf16 kernels can still make a rerun's trace differ; the stored trace is
+the record. **Gate:** closed ≥ 0.8 in k5_h10 on a prod
+`--limit 3 --cell 5,10` run before the sweep; else raise `max_thinking_tokens`
+to 4096. The same run checks that the argmax at `:` is a pool object in either
+case (not ` **`), and peak RSS. Gate on prod k5_h10, limit 3, at 1024: closed 0/3 → 4096.
+
+## D34 — state_tracking_thinking: readout positions in the trace
+
+**Why:** the answer alone cannot say what the model holds while it reasons,
+and reading every reasoning token at every layer would be too much storage. A
+mention that copies an update sentence is not a derived state, so the two are
+told apart.
+
+**Decided:** all recorded layers at the answer only; band layers at the trace
+positions. `sentence`: the last token of each reasoning sentence (a token
+holding a newline, or a `.?!` followed by whitespace or the end of the
+reasoning; consecutive such tokens count once), evenly spaced to at most
+`max_sentences` (120), first end kept, `ends[::ceil(n / 120)]`, so long hard
+traces keep their early steps (`sentence_sampling: "even"`). `prewrite`: the
+token before each object mention in either case form, located by character
+offset on the re-encoded text, with the offset (`char`) and `quoted` = the 40
+characters before contain `holding the`, `swaps it for the` or `holds the`.
+Prewrites are capped the same way (`max_prewrites`, 120, `prewrite_sampling: "even"`), each
+keeping its original mention index; its control is chosen over all mentions.
+
+## D35 — state_tracking_thinking: both case forms read, pooled on `base`
+
+**Why:** a trace writes `Bag` at a line start as often as ` bag`, and the lens
+can show either.
+
+**Decided:** each capitalised object that is one token after a space is read
+with the lower form's role row and `form = "cap"`; presence is the min over
+both forms (`base`); `capitals_dropped` in the manifest lists the rest. The
+answer-position numbers therefore differ in definition from state_tracking's
+§9 figures, which are lowercase only.
+
+## D36 — state_tracking_thinking: pre-write control and positive control
+
+**Why:** the next-written object is nearly trivially present just before it is
+written, so it is the in-trace positive control, and it needs a control at the
+same position to mean anything.
+
+**Decided:** control = the most recent different object written earlier in
+the trace, read at the same position; floor = the floor objects there. The
+report splits by `quoted` and prints `!!! POSITIVE CONTROL FAILS` when, J-lens,
+the next-written object's presence minus the control's is below `NEAR_FLOOR`.
+There is no state-claim parser yet, so pending-item (present, not yet written,
+true current state) and faithfulness (trace claim vs J-space vs truth)
+analyses are post hoc from the stored rows and trace; the parser's accuracy is
+to be measured on hand-labelled items before it is used.

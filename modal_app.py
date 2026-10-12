@@ -10,7 +10,13 @@ Two volumes persist: an HF cache (the 54 GB prod download happens once) and
 the results.
 """
 
+import os
+
 import modal
+
+# Override per person in a shared workspace, so runs never write into someone else's results.
+# Baked into the image env too, so the container commits the same volume it mounted.
+RESULTS_VOLUME = os.environ.get("COGNILOAD_RESULTS_VOLUME", "cogniload-results")
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -23,6 +29,7 @@ image = (
         # Persist Triton's compiled kernels, so only the first cold start pays.
         "TRITON_CACHE_DIR": "/cache/triton",
         "TOKENIZERS_PARALLELISM": "false",
+        "COGNILOAD_RESULTS_VOLUME": RESULTS_VOLUME,
     })
     .add_local_dir("src", "/repo/src")
     .add_local_dir("configs", "/repo/configs")
@@ -30,14 +37,18 @@ image = (
 
 app = modal.App("cogni-load-spar", image=image)
 cache = modal.Volume.from_name("cogniload-hf-cache", create_if_missing=True)
-results = modal.Volume.from_name("cogniload-results", create_if_missing=True)
+results = modal.Volume.from_name(RESULTS_VOLUME, create_if_missing=True)
 
 # The models are public, so no HF token. A gated model would need
 # `secrets=[modal.Secret.from_name("huggingface-token")]` below.
 GPU_FOR_ALIAS = {"dev": "L4", "prod": "H100"}
 
 
-@app.function(volumes={"/cache": cache, "/results": results}, timeout=4 * 60 * 60)
+# Modal's maximum: state_tracking_thinking can pass 4 h; per-cell shards let a rerun resume.
+# 128 GiB: loading the 27B passes its weights through host RAM (55 GiB peak on prod),
+# and a state_tracking_thinking shard then holds its rows in memory until written.
+@app.function(volumes={"/cache": cache, "/results": results}, timeout=24 * 60 * 60,
+              memory=131072)
 def run_stage(args: list[str]) -> str:
     """Run the CLI with `args`, then commit the volumes."""
     import os
@@ -59,11 +70,13 @@ def run_stage(args: list[str]) -> str:
 
 @app.local_entrypoint()
 def main(stage: str = "find_band", experiment: str = "", arm: str = "", model: str = "dev",
-         limit: int = 0, force: bool = False, gpu: str = "", top_tokens: int = 0):
+         limit: int = 0, force: bool = False, gpu: str = "", top_tokens: int = 0,
+         cell: str = ""):
     args = [stage, *([experiment] if experiment else []), "--model", model,
             *(["--arm", arm] if arm else []), *(["--limit", str(limit)] if limit else []),
             *(["--force"] if force else []),
-            *(["--top-tokens", str(top_tokens)] if top_tokens else [])]
+            *(["--top-tokens", str(top_tokens)] if top_tokens else []),
+            *(["--cell", cell] if cell else [])]
     # GPU follows the alias; `report` reads parquet only.
     fn = run_stage if stage == "report" else run_stage.with_options(
         gpu=gpu or GPU_FOR_ALIAS.get(model, "H100"))

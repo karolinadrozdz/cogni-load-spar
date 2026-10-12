@@ -21,6 +21,8 @@ from cogniload import exemplars, readout, registry, stimuli
 
 #: (rank column, lens) views each experiment's table is printed for.
 VIEWS = [("rank_wordlike", "jlens"), ("rank", "jlens"), ("rank_wordlike", "logit")]
+#: (lens, use_jacobian): the J-lens and its logit-lens control.
+LENSES = (("jlens", True), ("logit", False))
 
 
 def layer_range(n_layers: int, fraction: tuple[float, float]) -> list[int]:
@@ -73,22 +75,29 @@ def words_and_meta(stream: stimuli.Stream, pool: dict, n_absent: int) -> dict[st
 
 
 def read_both(ctx: SimpleNamespace, text: str, meta: dict[str, dict], positions: dict[int, str],
-              token_ids: list[int] | None = None) -> tuple[list[dict], torch.Tensor]:
+              token_ids: list[int] | None = None, max_seq_len: int | None = None
+              ) -> tuple[list[dict], torch.Tensor]:
     """J-lens and logit-lens readout of every word in `meta` at `positions` (token -> name).
 
     Returns the rows, each carrying its word's metadata, and the model's own
-    logits at `positions` from the J-lens pass.
+    logits at `positions` from the J-lens pass. `max_seq_len` goes to `readout.read`.
     """
     words = list(meta)
     ids = token_ids or [readout.token_id(ctx.model.tokenizer, w) for w in words]
     rows, model_logits = [], None
-    for lens_name, jacobian in (("jlens", True), ("logit", False)):
+    for lens_name, jacobian in LENSES:
         result, logits = readout.read(ctx.model, ctx.lens, text, words, ids, layers=ctx.layers,
-                                      positions=list(positions), use_jacobian=jacobian)
+                                      positions=list(positions), use_jacobian=jacobian,
+                                      max_seq_len=max_seq_len)
         model_logits = logits if model_logits is None else model_logits
         rows += [{**r, **meta[r["word"]], "lens": lens_name, "readout_at": positions[r["token_pos"]],
                   "in_band": ctx.band[0] <= r["layer"] < ctx.band[1]} for r in result]
     return rows, model_logits
+
+
+def token_at(offsets: list[tuple[int, int]], char: int) -> int:
+    """Index of the token whose character span holds `char`."""
+    return next(i for i, (a, b) in enumerate(offsets) if a <= char < b)
 
 
 def delimiters(tokenizer: Any, text: str, pieces: list[str]) -> list[int]:
@@ -103,7 +112,7 @@ def delimiters(tokenizer: Any, text: str, pieces: list[str]) -> list[int]:
     out = []
     for piece in pieces:
         char += len(piece)
-        index = next(i for i, (a, b) in enumerate(enc["offset_mapping"]) if a <= char < b)
+        index = token_at(enc["offset_mapping"], char)
         token = tokenizer.decode([enc["input_ids"][index]])
         assert "," in token or "." in token, f"expected a delimiter after {piece!r}, got {token!r}"
         out.append(index)
@@ -202,12 +211,26 @@ def load(prefix: str, alias: str, results_dir: Path, *, limit: bool = False,
     return pd.concat(map(pd.read_parquet, paths), ignore_index=True)
 
 
+#: (limit, label) of the `--limit` run and the full run, in report order.
+RUN_LABELS = ((True, "SMOKE (--limit)"), (False, "FULL"))
+
+
 def runs(prefix: str, alias: str, results_dir: Path, cell: str = "ct"):
     """Yield `(label, rows, summary)` for the `--limit` run and the full run, where present."""
-    for limit, label in ((True, "SMOKE (--limit)"), (False, "FULL")):
+    for limit, label in RUN_LABELS:
         try:
             yield (label, load(prefix, alias, results_dir, limit=limit, cell=cell),
                    load(prefix, alias, results_dir, limit=limit, kind="_summary", cell=cell))
+        except FileNotFoundError:
+            continue
+
+
+def summaries(prefix: str, alias: str, results_dir: Path, cell: str = "ct"):
+    """Yield `(label, limit, summary)` for the `--limit` run and the full run, where present."""
+    for limit, label in RUN_LABELS:
+        try:
+            yield label, limit, load(prefix, alias, results_dir, limit=limit, kind="_summary",
+                                     cell=cell)
         except FileNotFoundError:
             continue
 
