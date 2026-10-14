@@ -58,6 +58,32 @@ def test_with_trace_is_answer_only_plus_the_trace_block(tok):
     assert kept + "Answer:" == with_trace
 
 
+def test_wrong_is_the_poi_previous_object():
+    for k in (1, 3):
+        item = st.make_items(k, 1, 1, ["Ann", "Ben", "Tom"], st.OBJECTS[:21])[0]
+        assert sc.wrong_object(item) == item["chains"][item["poi"]][-2]
+
+
+def test_corruption_rewrites_unquoted_target_mentions_in_their_case(tok):
+    reasoning = ("The person holding the pen swaps it for the cup. After a lot of careful "
+                 "thought here, Ann has the pen.\nPen it is, not pens or a pen-like thing.")
+    out, counts = sc.corrupt(tok, reasoning, "pen", "map")
+    assert out == ("The person holding the pen swaps it for the cup. After a lot of careful "
+                   "thought here, Ann has the map.\nMap it is, not pens or a map-like thing.")
+    assert counts == {"n_replaced": 3, "n_quoted_kept": 1, "n_replaced_tail": 1,
+                      "corruption_empty": False}
+    assert sc.corrupt(tok, "Nothing here.", "pen", "map") == (
+        "Nothing here.", {"n_replaced": 0, "n_quoted_kept": 0, "n_replaced_tail": 0,
+                          "corruption_empty": True})
+
+
+def test_trace_contradicted_is_with_trace_but_for_the_answer_line(tok):
+    user, _, with_trace, reasoning = renders(tok)
+    contradicted = sc.build(tok, user, "map", reasoning)
+    assert contradicted.endswith(END)
+    assert with_trace.replace("Answer: bag<|im_end|>", "Answer: map<|im_end|>") == contradicted
+
+
 def test_answer_forms_drop_forms_sharing_an_id(tok):
     # The fake tokenizer splits on whitespace, so `yes` is ` yes`.
     assert sc.answer_forms(tok) == ({"yes": [" yes", " Yes"], "no": [" no", " No"]},
@@ -89,7 +115,7 @@ def fake_sources(args, tmp_path):
 def test_end_to_end_three_arms_then_report(ctx, monkeypatch, tmp_path, capsys):
     args = fake_stage(ctx, monkeypatch, tmp_path)
     fake_sources(args, tmp_path)
-    for arm in ("answer_only", "no_reasoning", "with_trace"):
+    for arm in ("answer_only", "no_reasoning", *sc.ARMS[2:]):
         cli.main(["self_check", "--arm", arm, "--limit", "1", *args])
     out = tmp_path / "dev"
     for arm in sc.ARMS:
@@ -101,7 +127,14 @@ def test_end_to_end_three_arms_then_report(ctx, monkeypatch, tmp_path, capsys):
                                                 "state_tracking_thinking": "limit"}
     s = pd.concat(experiment.load(f"self_check_{arm}", "dev", tmp_path, limit=True,
                                   kind="_summary", cell="k") for arm in sc.ARMS)
-    on = s[s.arm != "no_reasoning"]
+    injected = s[s.arm.isin(sc.WRONG_ANSWER)]
+    assert (injected.word == injected.wrong).all() and not injected.correct.any()
+    corrupted = s[s.arm == "trace_corrupted"]
+    # The fake trace writes the target capitalised and unquoted after the update it quotes.
+    assert (corrupted.n_replaced > 0).all() and not corrupted.corruption_empty.any()
+    assert not corrupted.apply(lambda r: f"Then the {r.target.capitalize()}." in r.prompt,
+                               axis=1).any()
+    on = s[s.arm.isin(["answer_only", "with_trace"])]
     assert not on[(on.k == 1) & (on.h == 1)].answer_is_object.any()
     assert on[(on.k != 1) | (on.h != 1)].correct.all()
     nr = s[s.arm == "no_reasoning"]
@@ -123,7 +156,9 @@ def test_end_to_end_three_arms_then_report(ctx, monkeypatch, tmp_path, capsys):
                   "b = answer_only vs a = no_reasoning", "b = with_trace vs a = answer_only",
                   "judge-position contents"):
         assert table in text
-    for column in ("auroc", "sign_p", "target_not_shown_ll", "closed=True", "off wrong, on right"):
+    for column in ("auroc", "sign_p", "target_not_shown_ll", "closed=True", "off wrong, on right",
+                   "wrong_not_shown_ll", "trace_corrupted vs trace_contradicted",
+                   "answer_injected vs answer_only", "corruption_empty=False", "n_replaced "):
         assert column in text
 
 

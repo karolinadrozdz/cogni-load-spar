@@ -655,3 +655,68 @@ About 13,000 explicit holder claims ("Ben holds the bell", "Ben: bell", "Sam=dru
 
 Outcome: the trace's state is always faithful to the truth in this grid, so the faithful-but-wrong vs unfaithful split has no errors to work on at 27B.
 
+
+---
+
+## 11. self_check (`prod`, Qwen3.6-27B)
+
+The 420 state_tracking derived items. One forward pass per item, no
+generation: the original question, an assistant turn `Answer: {object}`, then
+"Is your answer correct? Answer yes or no." with thinking off and prefill
+`Answer:`. `logit_diff` = logsumexp over yes forms − logsumexp over no forms;
+judged yes = `p_yes` > 0.5. Arms: `no_reasoning` (the thinking-off answer),
+`answer_only` (the thinking-on answer, trace removed), `with_trace` (the
+thinking-on answer with its reasoning trace in the assistant turn). Shown
+answers are the lower-case object word; correctness of the shown answer equals
+`correct_prefix` (it differs from strict scoring on 15 of 1,260 rows: the 7
+thinking-on first-sub-token items in two arms and 1 thinking-off item). The
+229 items with the same answer both ways share one pass between
+`no_reasoning` and `answer_only`.
+
+### Judge behaviour
+
+| arm | shown answer | n | mean logit_diff | median | judged yes | argmax |
+|---|---|---|---|---|---|---|
+| no_reasoning | wrong | 191 | −1.282 | −1.449 | 0.058 | no 180, yes 11 |
+| no_reasoning | right | 229 | 1.058 | 0.609 | 0.686 | yes 157, no 72 |
+| answer_only | right | 420 | 0.123 | −0.274 | 0.421 | no 245, yes 175 |
+| with_trace | right | 420 | 5.105 | 5.177 | 1.000 | yes 420 |
+
+### no_reasoning: logit_diff separating right from wrong shown answers (AUROC)
+
+| | n | n right | AUROC |
+|---|---|---|---|
+| all | 420 | 229 | 0.918 |
+| k = 1 | 60 | 58 | 1.000 |
+| k = 2 | 90 | 51 | 0.921 |
+| k = 3 | 90 | 43 | 0.890 |
+| k = 4 | 90 | 33 | 0.886 |
+| k = 5 | 90 | 44 | 0.876 |
+| h = 1 | 150 | 109 | 0.985 |
+| h = 2 | 60 | 48 | 0.984 |
+| h = 3 | 30 | 12 | 0.880 |
+| h = 4 | 60 | 26 | 0.816 |
+| h = 5 | 30 | 16 | 0.812 |
+| h = 6 | 30 | 10 | 0.765 |
+| h = 8 | 30 | 3 | 0.457 |
+| h = 10 | 30 | 5 | 0.752 |
+
+Calibration (`p_yes` bin → n, mean `p_yes`, accuracy): ≤ 0.2 → 114, 0.146, 0.088; 0.2–0.4 → 98, 0.289, 0.316; 0.4–0.6 → 72, 0.490, 0.847; 0.6–0.8 → 51, 0.700, 0.843; 0.8–1.0 → 85, 0.926, 0.988.
+
+### Paired on the same items
+
+| comparison | items | n | mean Δ logit_diff | median Δ | second higher / lower | sign-test p |
+|---|---|---|---|---|---|---|
+| answer_only (right answer) − no_reasoning (wrong answer) | thinking-off answer wrong | 191 | +0.283 | +0.243 | 110 / 81 | 0.042 |
+| with_trace − answer_only (same right answer) | all | 420 | +4.982 | +5.346 | 419 / 1 | 3e-124 |
+| with_trace − answer_only | trace closed | 418 | +4.976 | +5.340 | 417 / 1 | 1e-123 |
+| with_trace − answer_only | trace unclosed | 2 | +6.305 | +6.305 | 2 / 0 | 0.5 |
+
+### J-space at the judge position (J-lens / logit lens, in-band, `rank_wordlike` ≤ 25, case forms pooled)
+
+| arm | shown answer | n | yes | no | shown answer | target (when not shown) | other in-prompt objects | floor |
+|---|---|---|---|---|---|---|---|---|
+| no_reasoning | wrong | 191 | 1.000 / 1.000 | 0.000 / 1.000 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 |
+| no_reasoning | right | 229 | 1.000 / 1.000 | 0.000 / 1.000 | 0.000 / 0.000 | — | 0.000 / 0.000 | 0.000 / 0.000 |
+| answer_only | right | 420 | 1.000 / 1.000 | 0.000 / 1.000 | 0.000 / 0.000 | — | 0.000 / 0.000 | 0.000 / 0.000 |
+| with_trace | right | 420 | 1.000 / 1.000 | 0.826 / 1.000 | 0.000 / 0.000 | — | 0.000 / 0.000 | 0.000 / 0.000 |

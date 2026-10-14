@@ -4,7 +4,9 @@ state_tracking's derived items; an answer as the assistant turn; then "Is your a
 correct? Answer yes or no." with thinking off and `Answer:` prefilled. One forward pass
 reads the model's yes-vs-no logits and both lenses at the last token. Arms: `no_reasoning`
 shows the thinking-off run's answer, `answer_only` the thinking-on run's answer without its
-trace, `with_trace` the same answer with the trace kept in the assistant turn.
+trace, `with_trace` the same answer with the trace kept in the assistant turn. Three arms
+show a wrong answer, the PoI's previous object: `answer_injected` without a trace,
+`trace_contradicted` with the real trace, `trace_corrupted` with the trace rewritten to it.
 """
 
 from __future__ import annotations
@@ -22,7 +24,10 @@ from cogniload.experiment import VIEWS, presence
 from cogniload.state_tracking import FMT
 
 PREFIX = "self_check"
-ARMS = ("no_reasoning", "answer_only", "with_trace")
+ARMS = ("no_reasoning", "answer_only", "with_trace", "answer_injected", "trace_contradicted",
+        "trace_corrupted")
+WRONG_ANSWER = ("answer_injected", "trace_contradicted", "trace_corrupted")
+TRACED = ("with_trace", "trace_contradicted", "trace_corrupted")
 QUESTION = "Is your answer correct? Answer yes or no."
 HISTORY = "Answer: {word}"
 # The template drops reasoning from turns before the last user message, so the trace is
@@ -35,8 +40,15 @@ OFF, ON = "state_tracking_derived", stt.PREFIX
 ITEM = ["k", "h", "item_id"]
 # The judge-pass fields a `no_reasoning` item copies from `answer_only` when the prompts match.
 JUDGED = ["n_tokens", "logit_diff", "p_yes", "judge_argmax", "judge_top5", "form_logits"]
-JSPACE_KEYS = ["lens", "arm", "k", "h", "item_id", "base", "role", "is_shown", "correct"]
+JSPACE_KEYS = ["lens", "arm", "k", "h", "item_id", "base", "role", "chain_j", "is_shown",
+               "correct"]
 OTHER_IN_PROMPT = ["chain", "other_current", "other_stale"]
+# The last fifth of a trace, where its final answer is stated.
+TAIL = 0.8
+# (a, b) arm pairs on the same items, wrong answer as b: no trace; the same real trace; a trace
+# and answer both wrong vs both right; the same wrong answer with the trace agreeing vs not.
+WRONG_PAIRS = [("answer_only", "answer_injected"), ("with_trace", "trace_contradicted"),
+               ("with_trace", "trace_corrupted"), ("trace_contradicted", "trace_corrupted")]
 
 
 def shown_word(emitted: str, objects: list[str], dropped: list[str]) -> tuple[str, bool]:
@@ -48,6 +60,28 @@ def shown_word(emitted: str, objects: list[str], dropped: list[str]) -> tuple[st
     starts = [o for o in objects
               if token and (o == token or (o in dropped and o.startswith(token)))]
     return (starts[0], True) if len(starts) == 1 else (emitted.strip(), False)
+
+
+def wrong_object(item: dict) -> str:
+    """The wrong answer the injected arms show: the PoI's previous object, as if the last
+    swap were missed."""
+    return item["chains"][item["poi"]][-2]
+
+
+def corrupt(tokenizer, reasoning: str, target: str, wrong: str) -> tuple[str, dict]:
+    """The trace with every unquoted mention of `target` written as `wrong` in the same case,
+    and the counts. A quoted mention copies an update sentence, so it stays."""
+    enc = tokenizer(reasoning, return_offsets_mapping=True, add_special_tokens=False)
+    mentions = stt.prewrite(enc, reasoning, (0, len(reasoning)), [target])
+    replaced = [char for _, _, _, char, quoted in mentions if not quoted]
+    counts = {"n_replaced": len(replaced), "n_quoted_kept": len(mentions) - len(replaced),
+              "n_replaced_tail": sum(c >= TAIL * len(reasoning) for c in replaced),
+              "corruption_empty": not replaced}
+    # From the end, so earlier offsets still hold.
+    for char in reversed(replaced):
+        new = wrong.capitalize() if reasoning[char].isupper() else wrong
+        reasoning = reasoning[:char] + new + reasoning[char + len(target):]
+    return reasoning, counts
 
 
 def answer_forms(tokenizer) -> tuple[dict[str, list[str]], list[str]]:
@@ -123,9 +157,15 @@ def run_item(ctx, arm: str, item: dict, off: pd.Series, on: pd.Series,
     off_word, on_word = (shown_word(s["answer"], objects, ctx.caps_dropped)[0]
                          for s in (off, on))
     source = off if arm == "no_reasoning" else on
-    word, is_object = shown_word(source["answer"], objects, ctx.caps_dropped)
-    text = build(tok, user, word, on["reasoning"] if arm == "with_trace" else None)
-    target = item["chains"][item["poi"]][-1]
+    target, wrong = item["chains"][item["poi"]][-1], wrong_object(item)
+    if arm in WRONG_ANSWER:
+        word, is_object = wrong, True
+    else:
+        word, is_object = shown_word(source["answer"], objects, ctx.caps_dropped)
+    reasoning, corruption = on["reasoning"], {}
+    if arm == "trace_corrupted":
+        reasoning, corruption = corrupt(tok, reasoning, target, wrong)
+    text = build(tok, user, word, reasoning if arm in TRACED else None)
     correct = word == target
     copied = copy is not None and copy[0].prompt == text
     if copied:
@@ -144,12 +184,13 @@ def run_item(ctx, arm: str, item: dict, off: pd.Series, on: pd.Series,
     summary = {
         "arm": arm, **{c: item[c] for c in ("k", "h", "item_id", "last_is_needle", "poi")},
         "names": json.dumps(item["names"]), "chains": json.dumps(item["chains"]),
-        "floor": json.dumps(item["floor"]), "target": target, "emitted": source["answer"],
+        "floor": json.dumps(item["floor"]), "target": target, "wrong": wrong,
+        "emitted": source["answer"],
         "word": word, "answer_is_object": is_object, "correct": correct,
         "source_correct": bool(source["correct"]), "closed": bool(on["closed"]),
         # Same word both ways means byte-identical no_reasoning and answer_only prompts.
         "shared_with_answer_only": off_word == on_word, "copied_from_answer_only": copied,
-        "prompt": text, **judged,
+        "prompt": text, **judged, **corruption,
     }
     return rows, summary
 
@@ -310,12 +351,31 @@ def trace_vs_none(s: pd.DataFrame) -> pd.DataFrame:
                          *(paired_stats(f"correct={c}", g) for c, g in j.groupby("correct_a"))])
 
 
+def wrong_pairs(s: pd.DataFrame) -> pd.DataFrame:
+    """Each of WRONG_PAIRS whose arms are both in `s`: b, the wrong-answer arm, vs a."""
+    return pd.DataFrame([paired_stats(f"{b} vs {a}", pair(s, a, b)) for a, b in WRONG_PAIRS
+                         if {a, b} <= set(s.arm)])
+
+
+def corruption_splits(s: pd.DataFrame) -> pd.DataFrame:
+    """b = trace_corrupted vs a = with_trace, by corruption_empty and by n_replaced tercile
+    (labelled with its range), with b's mean logit_diff."""
+    j = pair(s, "with_trace", "trace_corrupted")
+    tercile = pd.qcut(j.n_replaced_b.rank(method="first"), 3, labels=False)
+    ranges = j.groupby(tercile).n_replaced_b.agg(lambda n: f"{int(n.min())}-{int(n.max())}")
+    groups = [*((f"corruption_empty={e}", g) for e, g in j.groupby("corruption_empty_b")),
+              *((f"n_replaced T{t + 1} {ranges[t]}", g) for t, g in j.groupby(tercile))]
+    return pd.DataFrame([{**paired_stats(name, g), "mean_logit_diff_b": g.logit_diff_b.mean()}
+                         for name, g in groups])
+
+
 def jspace(p: pd.DataFrame) -> pd.DataFrame:
     """Presence at the judge position per arm x correct, J-lens with the logit lens (`_ll`)
-    beside: the yes and no forms, the shown answer, the target when it is not shown, the other
-    in-prompt objects, the floor."""
+    beside: the yes and no forms, the shown answer, the target and the wrong object (the PoI's
+    previous one) when not shown, the other in-prompt objects, the floor."""
     groups = {"yes": p.role == "yes", "no": p.role == "no", "shown": p.is_shown,
               "target_not_shown": (p.role == "target") & ~p.is_shown,
+              "wrong_not_shown": (p.chain_j == 1) & ~p.is_shown,
               "other_in_prompt": p.role.isin(OTHER_IN_PROMPT) & ~p.is_shown,
               "floor": p.role == "floor"}
     rates = pd.DataFrame({c: p[m].groupby(["arm", "correct", "lens"])["present"].mean()
@@ -344,9 +404,11 @@ def report(spec: dict, config: dict, results_dir: Path) -> None:
         print(f"\n{head}: judge behaviour per arm x correct of the shown answer "
               f"(logit_diff = logsumexp yes forms - logsumexp no forms)")
         print(behaviour(s).to_string(**FMT))
+        shown = s[~s.arm.isin(WRONG_ANSWER)]
         print(f"  shown answer correct differs from the source run's strict correct on "
-              f"{int((s.correct != s.source_correct).sum())} of {len(s)} rows; shown answer "
-              f"not an object on {int((~s.answer_is_object).sum())}")
+              f"{int((shown.correct != shown.source_correct).sum())} of {len(shown)} rows "
+              f"(source-answer arms); shown answer not an object on "
+              f"{int((~shown.answer_is_object).sum())}")
         if "no_reasoning" in arms:
             nr = s[s.arm == "no_reasoning"]
             print(f"\n{head} no_reasoning discrimination: AUROC of logit_diff, correct vs wrong")
@@ -360,6 +422,13 @@ def report(spec: dict, config: dict, results_dir: Path) -> None:
         if {"answer_only", "with_trace"} <= arms:
             print(f"\n{head} paired, b = with_trace vs a = answer_only (same answer), all items")
             print(trace_vs_none(s).to_string(**p_fmt))
+        if any({a, b} <= arms for a, b in WRONG_PAIRS):
+            print(f"\n{head} paired, b = the wrong-answer arm vs a, same items")
+            print(wrong_pairs(s).to_string(**p_fmt))
+        if {"with_trace", "trace_corrupted"} <= arms:
+            print(f"\n{head} paired, b = trace_corrupted vs a = with_trace, by corruption_empty "
+                  f"and n_replaced tercile")
+            print(corruption_splits(s).to_string(**p_fmt))
         p = presence(rows, k, rank_col=rank_col, keys=JSPACE_KEYS)
         print(f"\n{head} judge-position contents per arm x correct, J-lens with logit lens "
               f"(_ll) [{rank_col}, in-band, k={k}, forms pooled on base]")

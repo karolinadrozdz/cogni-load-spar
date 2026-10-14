@@ -707,3 +707,26 @@ with the argmax and top 5 beside. Discrimination is the AUROC of `logit_diff`
 (rank-sum, ties averaged); paired arm differences use the exact sign test.
 Every form is also read through both lenses, at all recorded layers, as role
 `yes` / `no`, pooled on `base`.
+
+## D40 — self_check: the wrong object and the corrupted trace
+
+**Why:** thinking on is right on every item, so `answer_only` and `with_trace`
+cannot show whether the judge tracks correctness. A wrong answer has to be put
+in. The PoI's previous object is the error a model makes by missing the last
+swap, so it is plausible, and it exists for every k ≥ 1. A trace that
+contradicts its answer and a trace that agrees with a wrong answer are
+different tests, so both are built. Quoted mentions copy the prompt's update
+sentences; rewriting them would make the trace contradict the prompt
+outright.
+
+**Decided:** `wrong = chains[poi][-2]` (`wrong_object`), on every arm's
+summary. `answer_injected` is `answer_only` showing `wrong`;
+`trace_contradicted` is `with_trace` with the real trace showing `wrong`;
+`trace_corrupted` shows `wrong` with a trace in which every unquoted mention of
+the target is replaced by `wrong` in the same case. Mentions and `quoted` come
+from `state_tracking_thinking.prewrite`, as in D34. The corrupted trace goes in
+through `build`, as in D38. The summary records `n_replaced`, `n_quoted_kept`,
+`n_replaced_tail` (replacements in the trace's last fifth, where its final
+answer is stated) and `corruption_empty` (kept, flagged). Because the quoted
+update into the target stays, a corrupted trace still says "swaps it for the
+rope" before "now has hat": it is wrong without hiding the evidence.

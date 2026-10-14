@@ -236,22 +236,28 @@ answer correct? Answer yes or no." with thinking off and `Answer:` prefilled.
 No generation: one pass reads the yes-vs-no logit difference and both lenses at
 the last token. Arm `no_reasoning` shows the thinking-off run's answer,
 `answer_only` the thinking-on run's answer, `with_trace` that answer with its
-trace kept in the assistant turn. Both source runs must exist for the alias.
+trace kept in the assistant turn. Three arms show a wrong answer, the asked-about
+person's previous object: `answer_injected` with no trace, `trace_contradicted`
+with the real trace, and `trace_corrupted` with every unquoted mention of the
+target in the trace rewritten to it. Both source runs must exist for the alias.
 `no_reasoning` copies an item from `answer_only` when the two prompts are the
 same, so run `answer_only` first. `--cell K,H` runs one cell.
 
 ```bash
 modal run modal_app.py --stage self_check --arm answer_only --model dev --limit 2
 modal run modal_app.py --stage self_check --arm no_reasoning --model prod
+modal run modal_app.py --stage self_check --arm answer_injected --model prod
+modal run modal_app.py --stage self_check --arm trace_contradicted --model prod
+modal run modal_app.py --stage self_check --arm trace_corrupted --model prod
 modal run modal_app.py --stage report --experiment self_check --model prod
 ```
 
 Read the behaviour table first (`logit_diff` by arm and by whether the shown
 answer is correct), then the `no_reasoning` AUROC and calibration. The paired
 tables follow: `answer_only` vs `no_reasoning` on items the thinking-off run got
-wrong, and `with_trace` vs `answer_only` on every item. Last, the judge-position
-contents. To do: `answer_injected` (a counterfactual wrong answer without the
-trace) is not built yet.
+wrong, `with_trace` vs `answer_only` on every item, each wrong-answer arm
+against its right-answer twin, and `trace_corrupted` by how much was rewritten.
+Last, the judge-position contents.
 
 ## Outputs
 

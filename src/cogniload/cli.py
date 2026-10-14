@@ -9,7 +9,8 @@
     python -m cogniload.cli state_tracking_thinking [--cell K,H]
     python -m cogniload.cli hay_factorial
     python -m cogniload.cli hay_type --arm same|named|reworded
-    python -m cogniload.cli self_check --arm no_reasoning|answer_only|with_trace [--cell K,H]
+    python -m cogniload.cli self_check --arm no_reasoning|answer_only|with_trace|answer_injected|
+        trace_contradicted|trace_corrupted [--cell K,H]
     python -m cogniload.cli report <experiment>
 
 A stage skips any C_t whose shard already exists unless --force. `report`
@@ -33,7 +34,8 @@ EXPERIMENTS = ["single_cue", "forced_demand", "retro_cue", "derived_state", "sta
 SHARED = {"hay_factorial": "hay_load", "hay_type": "hay_load"}
 ARMS = {"derived_state": ["derived", "copyable"], "state_tracking": ["derived", "copyable"],
         "hay_type": ["same", "named", "reworded"],
-        "self_check": ["no_reasoning", "answer_only", "with_trace"]}
+        "self_check": ["no_reasoning", "answer_only", "with_trace", "answer_injected",
+                       "trace_contradicted", "trace_corrupted"]}
 CELL_STAGES = ("state_tracking_thinking", "self_check")
 
 
@@ -46,7 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--arm", choices=sorted({a for arms in ARMS.values() for a in arms}),
                         help="derived|copyable for derived_state and state_tracking; "
                              "same|named|reworded for hay_type; "
-                             "no_reasoning|answer_only|with_trace for self_check")
+                             "no_reasoning|answer_only|with_trace|answer_injected|"
+                             "trace_contradicted|trace_corrupted for self_check")
     parser.add_argument("--config", default="configs/experiments.yaml")
     parser.add_argument("--model", help="registry alias; overrides the config's")
     parser.add_argument("--out-dir", help="overrides the config's out_dir")
