@@ -190,7 +190,7 @@ modal run modal_app.py --stage report --experiment state_tracking_thinking --mod
 ```
 
 Before the sweep, the `--cell 5,10` run must show closed ≥ 0.8, an argmax that
-is a pool object and the peak RSS (D33). Read T1 first: `top1` per `k`, `h` and
+is a pool object and the peak RSS. Read T1 first: `top1` per `k`, `h` and
 `closed` against `top1_off` (thinking off, same items), and `retok_match`.
 Then the answer table by `closed`, the pre-write table by `quoted` (the
 next-written object against the control and `floor`; a `POSITIVE CONTROL
@@ -204,8 +204,9 @@ state_tracking's derived arm with the hays untied from the chain: `k` in {1,
 `tail_hays` (hays after the asked-about person's last needle) splits equally
 over {0, 2, 4} (those ≤ `h`); `pre_hays` is the rest. Both are columns of the
 summary. If the object pool is too small for `h = 12`, `h` is capped at 10 and
-the manifest says so (`h_capped`). No `report` yet; the summaries carry
-`correct`, `k`, `h`, `pre_hays`, `tail_hays`.
+the manifest says so (`h_capped`). `report hay_factorial` prints T1 per `k` x
+`h` x `tail_hays` and the logistic regression `correct ~ k + pre_hays +
+tail_hays`.
 
 ```bash
 python -m cogniload.cli hay_factorial --model dev --limit 5

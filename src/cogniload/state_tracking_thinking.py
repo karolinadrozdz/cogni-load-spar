@@ -13,6 +13,7 @@ import json
 import math
 import re
 import resource
+import sys
 import time
 import zlib
 from pathlib import Path
@@ -249,8 +250,9 @@ def _show(key: tuple[int, int], s: pd.DataFrame) -> None:
           f"{s.iloc[0]['answer_pos']}; median s/item: generate {s['t_generate'].median():.0f}, "
           f"read answer {s['t_read_answer'].median():.0f}, read reasoning "
           f"{s['t_read_reasoning'].median():.0f}")
-    # ru_maxrss is KiB on Linux, where Modal runs.
-    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20
+    # ru_maxrss is bytes on macOS, KiB on Linux.
+    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (
+        2**30 if sys.platform == "darwin" else 2**20)
     print(f"  k={key[0]} h={key[1]}: top-1 {s['correct'].mean():.0%}, closed "
           f"{s['closed'].mean():.0%}, median reasoning tokens "
           f"{s['n_reasoning_tokens'].median():.0f}; "
@@ -416,6 +418,8 @@ def floor_writes(p: pd.DataFrame, by: str = "writing") -> pd.DataFrame:
     """Unquoted writes of a floor object, per `by` (`writing`, or `prose`: one of PROSE), most
     written first: n and presence, J-lens and logit lens (`_ll`)."""
     w = p[(p.role == "floor") & (p.base == p.writing) & ~p.quoted]
+    if w.empty:
+        return pd.DataFrame(columns=[by, "n", "present", "present_ll"])
     out = w.assign(prose=w.writing.isin(PROSE)).groupby([by, "lens"])["present"].agg(
         ["size", "mean"]).unstack("lens")
     return pd.DataFrame({"n": out[("size", "jlens")], "present": out[("mean", "jlens")],
@@ -517,10 +521,13 @@ def thinking_off_summary(alias: str, results_dir: Path) -> pd.DataFrame | None:
     run, else None."""
     for limit in (False, True):
         try:
-            return experiment.load("state_tracking_derived", alias, results_dir, limit=limit,
-                                   kind="_summary", cell="k")
+            off = experiment.load("state_tracking_derived", alias, results_dir, limit=limit,
+                                  kind="_summary", cell="k")
         except FileNotFoundError:
             continue
+        print(f"thinking-off comparison uses the {'--limit' if limit else 'full'} "
+              f"state_tracking_derived run")
+        return off
     return None
 
 
@@ -612,7 +619,11 @@ def print_prewrite_by_k(head: str, writes: pd.DataFrame, tag: str) -> None:
                               "present_ll", "control_ll", "floor_ll"]].to_string(**FMT))
     print(f"\n{head} unquoted floor-object writes, top 10 words, and {'/'.join(PROSE)} "
           f"(prose) vs the other floor words {tag}")
-    print(floor_writes(writes).head(10).to_string(**FMT))
+    by_word = floor_writes(writes)
+    if by_word.empty:
+        print("  no floor-object writes in this run")
+        return
+    print(by_word.head(10).to_string(**FMT))
     print(floor_writes(writes, "prose").to_string(**FMT))
 
 

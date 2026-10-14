@@ -296,6 +296,11 @@ def test_floor_writes_counts_unquoted_floor_writes_per_word_and_prose():
     assert stt.floor_writes(p, "prose").set_index("prose").n.to_dict() == {True: 2, False: 1}
 
 
+def test_floor_writes_is_empty_without_unquoted_floor_writes():
+    p = prewrite_rows([(lens, "map", "map", "floor", True, True, 0) for lens in ("jlens", "logit")])
+    assert stt.floor_writes(p).empty and stt.floor_writes(p, "prose").empty
+
+
 def test_state_claims_finds_each_pattern_in_either_case_and_markdown():
     text = ("Ann holds the bag. **Ben**: Cup, Tom -> key, Ann → cup, Ben=bag. Tom now has the "
             "pen and Ann is holding the KEY. Ann swaps the bag. the bag holds Ann.")
