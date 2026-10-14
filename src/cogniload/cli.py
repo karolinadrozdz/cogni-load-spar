@@ -9,6 +9,7 @@
     python -m cogniload.cli state_tracking_thinking [--cell K,H]
     python -m cogniload.cli hay_factorial
     python -m cogniload.cli hay_type --arm same|named|reworded
+    python -m cogniload.cli self_check --arm no_reasoning|answer_only|with_trace [--cell K,H]
     python -m cogniload.cli report <experiment>
 
 A stage skips any C_t whose shard already exists unless --force. `report`
@@ -27,11 +28,13 @@ import yaml
 from cogniload import registry
 
 EXPERIMENTS = ["single_cue", "forced_demand", "retro_cue", "derived_state", "state_tracking",
-               "state_tracking_thinking"]
+               "state_tracking_thinking", "self_check"]
 #: Stages in a shared module: stage -> the module with its `run_<stage>`, `report_<stage>`.
 SHARED = {"hay_factorial": "hay_load", "hay_type": "hay_load"}
 ARMS = {"derived_state": ["derived", "copyable"], "state_tracking": ["derived", "copyable"],
-        "hay_type": ["same", "named", "reworded"]}
+        "hay_type": ["same", "named", "reworded"],
+        "self_check": ["no_reasoning", "answer_only", "with_trace"]}
+CELL_STAGES = ("state_tracking_thinking", "self_check")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,7 +45,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="what to report")
     parser.add_argument("--arm", choices=sorted({a for arms in ARMS.values() for a in arms}),
                         help="derived|copyable for derived_state and state_tracking; "
-                             "same|named|reworded for hay_type")
+                             "same|named|reworded for hay_type; "
+                             "no_reasoning|answer_only|with_trace for self_check")
     parser.add_argument("--config", default="configs/experiments.yaml")
     parser.add_argument("--model", help="registry alias; overrides the config's")
     parser.add_argument("--out-dir", help="overrides the config's out_dir")
@@ -51,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--top-tokens", type=int, metavar="N",
                         help="state_tracking: print top tokens for N items, write nothing")
     parser.add_argument("--cell", type=lambda s: tuple(map(int, s.split(","))), metavar="K,H",
-                        help="state_tracking_thinking: run this (k, h) cell only")
+                        help="state_tracking_thinking and self_check: run this (k, h) cell only")
     args = parser.parse_args(argv)
     if (args.stage == "report") != bool(args.experiment):
         parser.error("name an experiment after `report`, and only there")
@@ -61,8 +65,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"--arm is only for {', '.join(ARMS)}")
     if args.top_tokens and args.stage != "state_tracking":
         parser.error("--top-tokens is only for state_tracking")
-    if args.cell and args.stage != "state_tracking_thinking":
-        parser.error("--cell is only for state_tracking_thinking")
+    if args.cell and args.stage not in CELL_STAGES:
+        parser.error(f"--cell is only for {' and '.join(CELL_STAGES)}")
 
     config = yaml.safe_load(Path(args.config).read_text())
     results = Path(args.out_dir or config["out_dir"])

@@ -229,6 +229,30 @@ modal run modal_app.py --stage hay_type --arm named --model dev --limit 5
 modal run modal_app.py --stage hay_type --arm reworded --model dev --limit 5
 ```
 
+### self_check
+
+state_tracking's derived items, an answer as the assistant turn, then "Is your
+answer correct? Answer yes or no." with thinking off and `Answer:` prefilled.
+No generation: one pass reads the yes-vs-no logit difference and both lenses at
+the last token. Arm `no_reasoning` shows the thinking-off run's answer,
+`answer_only` the thinking-on run's answer, `with_trace` that answer with its
+trace kept in the assistant turn. Both source runs must exist for the alias.
+`no_reasoning` copies an item from `answer_only` when the two prompts are the
+same, so run `answer_only` first. `--cell K,H` runs one cell.
+
+```bash
+modal run modal_app.py --stage self_check --arm answer_only --model dev --limit 2
+modal run modal_app.py --stage self_check --arm no_reasoning --model prod
+modal run modal_app.py --stage report --experiment self_check --model prod
+```
+
+Read the behaviour table first (`logit_diff` by arm and by whether the shown
+answer is correct), then the `no_reasoning` AUROC and calibration. The paired
+tables follow: `answer_only` vs `no_reasoning` on items the thinking-off run got
+wrong, and `with_trace` vs `answer_only` on every item. Last, the judge-position
+contents. To do: `answer_injected` (a counterfactual wrong answer without the
+trace) is not built yet.
+
 ## Outputs
 
 Under `results/<alias>/`, or the `cogniload-results` Modal volume at
@@ -245,7 +269,8 @@ derived_state names carry the arm: `derived_state_copyable_ct2.parquet`.
 state_tracking shards are per cell, with the arm: `state_tracking_derived_k3_h6.parquet`.
 state_tracking_thinking shards are per cell: `state_tracking_thinking_k3_h6.parquet`.
 hay_factorial shards are per cell (`hay_factorial_k3_h4.parquet`); hay_type's carry
-the arm (`hay_type_named_k3_h6.parquet`).
+the arm (`hay_type_named_k3_h6.parquet`). self_check's are per cell, with the arm:
+`self_check_with_trace_k3_h6.parquet`.
 
 Presence is band-min rank ≤ `readout.primary_k` (25). `rank` is over the full
 vocabulary; `rank_wordlike` over word-like tokens only, which is what
@@ -269,6 +294,7 @@ src/cogniload/
   state_tracking.py       state_tracking: its own items (no streams), the arm, tables
   state_tracking_thinking.py  state_tracking's derived items with thinking on
   hay_load.py             hay_factorial and hay_type: state_tracking items with the hays varied
+  self_check.py           a yes/no confidence follow-up on state_tracking's answers
   prompts.py              shared templates; chat rendering with the thinking assertion
   readout.py              lens ranks per word, layer and position
   stimuli.py              seeded stream generation (pure)

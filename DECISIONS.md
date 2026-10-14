@@ -650,3 +650,60 @@ There is no state-claim parser yet, so pending-item (present, not yet written,
 true current state) and faithfulness (trace claim vs J-space vs truth)
 analyses are post hoc from the stored rows and trace; the parser's accuracy is
 to be measured on hand-labelled items before it is used.
+
+## D37 — self_check: the three arms and the shown answer
+
+**Why:** confidence is only informative where the answer can be wrong, and it
+has to be read on the same items with the same answer form in every arm, or
+the arm comparison mixes the answer with the condition. Thinking off is wrong
+on 191 of 420 items, thinking on on none (under `correct_prefix`).
+
+**Decided:** state_tracking's 420 derived items (14 cells × 30), regenerated
+with `make_items` and asserted to match both source summaries' `chains`, and
+the thinking-off run's `prompt`. `no_reasoning` shows the thinking-off answer;
+`answer_only` the thinking-on answer without its trace; `with_trace` that
+answer with the trace (D38). The assistant turn is exactly `Answer: {word}`.
+`word` is the lowercase item object the emitted token is or starts (` Bell` →
+`bell`, ` V` → `vase`), else the stripped token (` **`), with
+`answer_is_object = False`. Only an object whose capital is not one token
+(`capitals_dropped`) can be started, so ` K` is `kite` even with `key` in
+the prompt: the model would have written ` Key`. `correct = word == target`,
+which equals `correct_prefix` on every prod item. Where both answers give the
+same `word` (229 items) the `no_reasoning` and `answer_only` prompts are
+byte-identical (`shared_with_answer_only`), and `no_reasoning` copies that
+item's summary fields and rows from the `answer_only` shard if it exists
+(`copied_from_answer_only`). Each source is its full run if there is one,
+else its `--limit` run; the manifest's `sources` says which.
+
+## D38 — self_check: the with_trace render bypasses the template
+
+**Why:** the Qwen template drops the reasoning from every assistant turn
+before the last user message, so a trace passed through it would vanish and
+`with_trace` would be `answer_only`.
+
+**Decided:** render `answer_only`, then insert `<think>\n{reasoning}\n</think>\n\n`
+directly after the historical `<|im_start|>assistant\n`, the reasoning
+stripped as the template trims a kept trace. That is byte-identical to the
+template's own render with `preserve_thinking=True`, and removing the block
+gives `answer_only` exactly (both tested). An unclosed trace gets the same
+insertion, so it reads as closed; `closed` is on the summary and the paired
+table splits by it. The final turn is asserted to end in the thinking-off
+block plus `Answer:`. `max_seq_len` is the encoded length (traces run to
+~4,400 tokens).
+
+## D39 — self_check: the yes/no logit difference and its forms
+
+**Why:** the answer token after `Answer:` can be any casing or spacing of yes
+or no, so one form alone would miss confidence that went into another;
+summing within each answer keeps the measure about the answer, not its
+spelling.
+
+**Decided:** forms ` yes`, ` Yes`, `yes` and ` no`, ` No`, `no`, each kept
+only if it is one token with an id no earlier form has; the dropped ones go
+to the manifest (`answer_forms_dropped`). From the model's own logits at the
+last token, `logit_diff = logsumexp(yes forms) − logsumexp(no forms)` and
+`p_yes` = the yes share of the softmax over those forms (`sigmoid(logit_diff)`),
+with the argmax and top 5 beside. Discrimination is the AUROC of `logit_diff`
+(rank-sum, ties averaged); paired arm differences use the exact sign test.
+Every form is also read through both lenses, at all recorded layers, as role
+`yes` / `no`, pooled on `base`.
