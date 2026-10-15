@@ -720,3 +720,32 @@ Calibration (`p_yes` bin → n, mean `p_yes`, accuracy): ≤ 0.2 → 114, 0.146,
 | no_reasoning | right | 229 | 1.000 / 1.000 | 0.000 / 1.000 | 0.000 / 0.000 | — | 0.000 / 0.000 | 0.000 / 0.000 |
 | answer_only | right | 420 | 1.000 / 1.000 | 0.000 / 1.000 | 0.000 / 0.000 | — | 0.000 / 0.000 | 0.000 / 0.000 |
 | with_trace | right | 420 | 1.000 / 1.000 | 0.826 / 1.000 | 0.000 / 0.000 | — | 0.000 / 0.000 | 0.000 / 0.000 |
+
+### Wrong-answer and corrupted-trace arms
+
+Wrong object = the PoI's previous object (the one before the last swap).
+`answer_injected`: no trace, wrong answer. `trace_contradicted`: the real
+trace, wrong answer. `trace_corrupted`: every unquoted mention of the target
+in the trace rewritten to the wrong object (median 21 per trace, range 4–38;
+quoted copies of the prompt's update sentences, median 4, unchanged), wrong
+answer; the trace therefore states the wrong final state while still quoting
+the update that contradicts it.
+
+| arm | trace | shown answer | n | mean logit_diff | median | judged yes |
+|---|---|---|---|---|---|---|
+| answer_only | none | right | 420 | 0.123 | −0.274 | 0.421 |
+| answer_injected | none | wrong | 420 | −1.686 | −1.748 | 0.002 |
+| with_trace | real | right | 420 | 5.105 | 5.177 | 1.000 |
+| trace_contradicted | real | wrong | 420 | −2.927 | −2.964 | 0.000 |
+| trace_corrupted | corrupted | wrong | 420 | 2.814 | 2.750 | 1.000 |
+
+| paired on the same items | mean Δ logit_diff | median Δ | second higher / lower | sign-test p |
+|---|---|---|---|---|
+| answer_injected − answer_only | −1.809 | −1.260 | 65 / 355 | 2e-49 |
+| trace_contradicted − with_trace | −8.032 | −8.083 | 0 / 420 | 7e-127 |
+| trace_corrupted − with_trace | −2.290 | −2.213 | 0 / 420 | 7e-127 |
+| trace_corrupted − trace_contradicted | +5.742 | +5.739 | 420 / 0 | 7e-127 |
+
+`trace_corrupted` by number of replaced mentions (terciles 4–19, 19–22, 22–38): mean logit_diff 2.40, 2.88, 3.16; Δ vs with_trace −2.71, −2.23, −1.93.
+
+J-space at the judge position (J-lens, in-band): "no" present in 0.948 (trace_contradicted), 0.976 (trace_corrupted), 0.826 (with_trace), 0.000 in arms without a trace; "yes" 1.000 in every arm; shown answer, target and wrong object ≤ 0.005. Logit lens: yes and no 1.000 everywhere.
