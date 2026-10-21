@@ -164,9 +164,9 @@ def run(cfg: dict) -> str:
         if end_think in ids:
             k = ids.index(end_think) + 1
             reasoning, truncated = tok.decode(ids[:k - 1], skip_special_tokens=True), 0
-        elif thinking_active:
+        elif thinking_active and out.finish_reason == "length":
             k, reasoning, truncated = len(ids), tok.decode(ids, skip_special_tokens=True), 1
-        else:
+        else:  # thinking off, or a non-thinking checkpoint run with --thinking native
             k, reasoning, truncated = 0, "", 0
         j = k
         while j < len(ids) and tok.decode([ids[j]]).strip() == "":
