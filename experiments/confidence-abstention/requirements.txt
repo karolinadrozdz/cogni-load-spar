@@ -1,0 +1,7 @@
+# local: launching runs, fetching results, analyze.py. GPU-side deps live in the Modal image.
+modal>=1.0
+pandas
+numpy
+scipy
+scikit-learn
+statsmodels
