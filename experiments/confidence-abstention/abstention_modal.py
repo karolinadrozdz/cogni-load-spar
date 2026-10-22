@@ -1,12 +1,12 @@
 """Kumaran et al. (2026) abstention paradigm on a Qwen3 checkpoint, via vLLM on Modal.
 
     # quick early signal: thinking-only checkpoint, 200 questions, phases 0/1/2 + verbal
-    modal run abstention_modal.py --model Qwen/Qwen3-30B-A3B-Thinking-2507 --thinking native --n 200
+    modal run abstention_modal.py::main --model Qwen/Qwen3-30B-A3B-Thinking-2507 --thinking native --n 200
     # paper-matched model (always thinks); needs ~2x H200 or 4x H100 in bf16
-    modal run abstention_modal.py --model Qwen/Qwen3-Next-80B-A3B-Thinking --thinking native --gpu H200:2
+    modal run abstention_modal.py::main --model Qwen/Qwen3-Next-80B-A3B-Thinking --thinking native --gpu H200:2
     # hybrid checkpoint, same weights with thinking off (= the paper's setting) and on
-    modal run abstention_modal.py --model Qwen/Qwen3-8B --thinking off --n 1000 --phases 0,1,2,4
-    modal run abstention_modal.py --model Qwen/Qwen3-8B --thinking on  --n 1000 --phases 0,1,2,4
+    modal run abstention_modal.py::main --model Qwen/Qwen3-8B --thinking off --n 1000 --phases 0,1,2,4
+    modal run abstention_modal.py::main --model Qwen/Qwen3-8B --thinking on  --n 1000 --phases 0,1,2,4
 
 Prompts, option shuffling (seed 1042), choice-token logprob readout, verbal-confidence
 classes and the CSV schema follow the paper's notebook (OSF resw4) verbatim. Added
@@ -22,11 +22,17 @@ Outputs land in the `abstention-results` volume under <tag>/:
   analysis.json analyze.py run inside the container
   params.json   run configuration, resolved library versions, model commit; written last,
                 so its presence means the run is complete
-Overnight: `modal run --detach ...` keeps the job alive after the laptop sleeps; `./handoff.sh <tag>`
+In-trace confidence checkpoints on a finished thinking run (reads <tag>/phases.csv, writes
+checkpoints.csv + checkpoints_params.json; see README):
+    modal run abstention_modal.py::checkpoints --tag 80b-thinking --gpu H200:2
+With two entrypoints Modal needs the explicit ::main / ::checkpoints form.
+Overnight: `modal run --detach abstention_modal.py::main ...` keeps the job alive after the laptop sleeps; `./handoff.sh <tag>`
 waits for params.json, fetches the directory and re-runs analyze.py locally.
 """
 
 import os
+import re
+from bisect import bisect_right
 from pathlib import Path
 
 import modal
@@ -118,17 +124,71 @@ def arrangements(n, seed=1042):
     return out
 
 
+def digit_logprobs(top, digits):
+    """Paper's extract_digit_logprobs; -50 placeholder when a digit is outside the top-20."""
+    return {d: max([top[c] for c in (str(d), f" {d}", f"{d})", f" {d})") if c in top], default=-50.0)
+            for d in digits}
+
+
+def softmax(d):
+    import numpy as np
+    v = np.array(list(d.values()))
+    p = np.exp(v - v.max())
+    return dict(zip(d, p / p.sum()))
+
+
+# ---- in-trace checkpoints (pure helpers; used by `probe`) -----------------------------------
+
+MARKER_RE = (r"\b(wait|actually|hmm|hold on|let me (?:re-?check|re-?consider|re-?think|double-?check|think again)"
+             r"|on second thought|no,)(?!\w)")
+
+
+def thin(xs, k):
+    """At most k items of xs, evenly spaced over it (keeps the first and last when k >= 2)."""
+    if len(xs) <= k:
+        return list(xs)
+    if k <= 1:
+        return [xs[len(xs) // 2]] if k == 1 else []
+    return [xs[round(i * (len(xs) - 1) / (k - 1))] for i in range(k)]
+
+
+def select_checkpoints(reasoning, tok, every, max_checkpoints, regex=MARKER_RE):
+    """Token positions (probe = first `token_pos` trace tokens) of start / fixed / marker / end checkpoints.
+    Traces have ~30 markers, nearly all early, so half the slots are reserved for fixed intervals and the
+    markers are thinned evenly along the trace rather than taken earliest-first."""
+    enc = tok(reasoning, add_special_tokens=False, return_offsets_mapping=True)
+    T, ends = len(enc.input_ids), [e for _, e in enc.offset_mapping]
+    marks = {}  # position of the token containing the marker's first character -> marker text
+    for m in re.finditer(regex, reasoning, re.I):
+        pos = bisect_right(ends, m.start())
+        if 0 < pos < T:
+            marks.setdefault(pos, m.group(1).lower())
+    room = max(max_checkpoints - 2, 0)
+    fixed = thin([p for p in range(every, T, every) if p not in marks], room // 2)
+    keep = thin(sorted(marks), room - len(fixed))
+    cps = ([dict(token_pos=0, kind="start", marker=None), dict(token_pos=T, kind="end", marker=None)]
+           + [dict(token_pos=p, kind="marker", marker=marks[p]) for p in keep]
+           + [dict(token_pos=p, kind="fixed", marker=None) for p in fixed])
+    return sorted(cps, key=lambda c: c["token_pos"])
+
+
+def probe_text(rendered_prompt, prefix_text):
+    """Prompt + trace prefix + forced close of the think block (adds <think> if the template did not)."""
+    head = rendered_prompt if rendered_prompt.rstrip().endswith("<think>") else rendered_prompt + "<think>\n"
+    text = head + prefix_text.rstrip() + "\n</think>\n\n"
+    assert text.count("</think>") == 1, "probe text must contain exactly one </think>"
+    return text
+
+
 # ---- experiment ---------------------------------------------------------------------
 
 @app.function(volumes={"/cache": cache, "/results": results}, timeout=8 * 60 * 60, memory=65536)
 def run(cfg: dict) -> str:
     import json
-    import re
     import subprocess
     import sys
     import time
 
-    import numpy as np
     import pandas as pd
     import torch
     import vllm
@@ -177,11 +237,6 @@ def run(cfg: dict) -> str:
                     generated_tokens=len(ids), finish_reason=out.finish_reason, top=top,
                     wait_count=len(re.findall(r"\bwait\b", reasoning, re.I)))
 
-    def digit_logprobs(top, digits):
-        """Paper's extract_digit_logprobs; -50 placeholder when a digit is outside the top-20."""
-        return {d: max([top[c] for c in (str(d), f" {d}", f"{d})", f" {d})") if c in top], default=-50.0)
-                for d in digits}
-
     def parse_answer(content, lps, valid):
         if content in [str(v) for v in valid]:
             return content, "exact"
@@ -189,11 +244,6 @@ def run(cfg: dict) -> str:
         if m and int(m.group(1)) in valid:
             return m.group(1), "regex"
         return str(max(valid, key=lambda v: lps[v])), "logprob"
-
-    def softmax(d):
-        v = np.array(list(d.values()))
-        p = np.exp(v - v.max())
-        return dict(zip(d, p / p.sum()))
 
     qs = {0: pd.read_csv("/data/phase0_questions.csv").head(cfg["n"]),
           1: pd.read_csv("/data/phase1_questions.csv").head(cfg["n"])}
@@ -292,3 +342,74 @@ def main(model: str = "Qwen/Qwen3-30B-A3B-Thinking-2507", thinking: str = "nativ
                temperature=temperature, seed=seed, tp=int(gpu.split(":")[1]) if ":" in gpu else 1,
                tag=tag or f"{model.split('/')[-1]}_{thinking}_n{n}_{time.strftime('%Y%m%d-%H%M')}")
     print(run.with_options(gpu=gpu).remote(cfg))
+
+
+@app.function(volumes={"/cache": cache, "/results": results}, timeout=8 * 60 * 60, memory=65536)
+def probe(cfg: dict) -> str:
+    """For each finished trace in <tag>/phases.csv: force-close the think block at several points
+    along the trace and read the answer-digit distribution ("if you had to answer now")."""
+    import json
+
+    import pandas as pd
+    import vllm
+    from vllm import LLM, SamplingParams
+
+    out = Path("/results") / cfg["tag"]
+    params = json.loads((out / "params.json").read_text())
+    model, thinking = cfg["model"] or params["model"], params["thinking"]
+    assert thinking != "off", "no reasoning traces to probe in a --thinking off run"
+    template_kw = {} if thinking == "native" else {"enable_thinking": True}
+    df = pd.read_csv(out / "phases.csv")
+
+    llm = LLM(model=model, tensor_parallel_size=cfg["tp"], gpu_memory_utilization=0.92, enable_prefix_caching=True,
+              max_model_len=max(params["max_model_len"], params["budget"] + 1024), seed=params["seed"])
+    tok = llm.get_tokenizer()
+    cache.commit()
+
+    rows = []
+    for phase in cfg["phases"]:
+        valid = [1, 2, 3, 4] + ([5] if phase == 2 else [])
+        g = df[(df.phase == phase) & (df.truncated == 0) & df.reasoning.fillna("").str.strip().ne("")]
+        if cfg["n"] > 0:
+            g = g[g.question_index < cfg["n"]]
+        texts, meta = [], []
+        for r in g.itertuples():
+            rendered = tok.apply_chat_template([{"role": "user", "content": r.prompt}], tokenize=False,
+                                               add_generation_prompt=True, **template_kw)
+            ids = tok(r.reasoning, add_special_tokens=False).input_ids
+            for j, c in enumerate(select_checkpoints(r.reasoning, tok, cfg["every"], cfg["max_checkpoints"])):
+                texts.append(probe_text(rendered, tok.decode(ids[:c["token_pos"]], skip_special_tokens=True)))
+                meta.append((r, j, c, len(ids)))
+        outs = llm.generate(texts, SamplingParams(max_tokens=1, temperature=0, logprobs=20))
+        for o, (r, j, c, T) in zip(outs, meta):
+            gen = o.outputs[0]
+            lps = digit_logprobs({lp.decoded_token: lp.logprob for lp in gen.logprobs[0].values()}, valid)
+            conf = softmax(lps)
+            sampled = tok.decode(gen.token_ids[:1]).strip()
+            forced = sampled if sampled in [str(v) for v in valid] else str(max(valid, key=lambda v: lps[v]))
+            rows.append(dict(phase=phase, question_index=r.question_index, checkpoint_idx=j,
+                             token_pos=c["token_pos"], trace_tokens=T, frac=c["token_pos"] / T, kind=c["kind"],
+                             marker=c["marker"], forced_answer=forced, prob_forced=conf[int(forced)],
+                             **{f"prob_{k}": conf.get(k, float("nan")) for k in range(1, 6)},
+                             prob_final=conf[int(r.final_answer)], matches_final=int(forced == str(r.final_answer)),
+                             final_answer=r.final_answer, is_correct=r.is_correct, is_nota=r.is_nota,
+                             gt_position=r.gt_position))
+        print(f"phase {phase}: {len(g)} traces, {len(texts)} probes", flush=True)
+        pd.DataFrame(rows).to_csv(out / "checkpoints.csv", index=False)
+        results.commit()
+
+    kinds = pd.DataFrame(rows).kind.value_counts().to_dict()
+    (out / "checkpoints_params.json").write_text(json.dumps(
+        dict(tag=cfg["tag"], model=model, thinking=thinking, phases=cfg["phases"], every=cfg["every"],
+             max_checkpoints=cfg["max_checkpoints"], n=cfg["n"], regex=MARKER_RE, checkpoints_by_kind=kinds,
+             vllm=vllm.__version__), indent=2))
+    results.commit()
+    return f"{cfg['tag']}: {len(rows)} checkpoints -> {RESULTS_VOLUME}/{cfg['tag']}/checkpoints.csv"
+
+
+@app.local_entrypoint()
+def checkpoints(tag: str, gpu: str = "H100", phases: str = "1,2", every: int = 256, max_checkpoints: int = 20,
+                n: int = 0, model: str = ""):
+    cfg = dict(tag=tag, model=model, phases=[int(p) for p in phases.split(",")], every=every,
+               max_checkpoints=max_checkpoints, n=n, tp=int(gpu.split(":")[1]) if ":" in gpu else 1)
+    print(probe.with_options(gpu=gpu).remote(cfg))
