@@ -49,13 +49,17 @@ And these fields:
 - `rationale`: one sentence quoting the decisive span of the trace.
 
 ## How to label
-An LLM judge (Claude via the API) with the rubric above as the system prompt and one trace per call,
-returning JSON with exactly those fields. Run it twice with two different models (or two different
-prompt phrasings) and report agreement on `kind` (Cohen's κ; target ≥ 0.75). Where they disagree, a
-third call with both rationales shown breaks the tie, and the row is flagged `disagreed = 1`.
-Then a human reads 40 rows (10 per kind, random) and records agreement; report it. Do not tune the
-rubric to the traces after reading the results — if the rubric needs changing, change it, relabel
+Two Claude Sonnet judges, one per rubric wording (`trace_labels/rubric_a.md`, the wording above;
+`trace_labels/rubric_b.md`, a decision-procedure rewording), each returning JSON with exactly those fields.
+Set A goes in batches of 10 traces per judge, sets B–D in batches of 5; any batch a judge could not complete
+is re-done one trace per call. Report agreement on `kind` (Cohen's κ and raw agreement, per set). Where the
+two kinds differ, a per-item Sonnet tiebreak call with both rationales shown decides, and the row is flagged
+`disagreed = 1`. Then a human reads 40 rows (10 per kind, random) and records agreement; report it. Do not
+tune the rubric to the traces after reading the results — if the rubric needs changing, change it, relabel
 everything, and say so.
+Regex route proxies do not separate the routes (the `none of the options|no correct answer|not among the
+options|not listed` pattern matches all 207 Qwen-80B abstentions, including 62/62 JUDGE); routes come from the
+judge pipeline only.
 
 Output: `results/80b-thinking/trace_labels.csv` (all fields above plus `set` A–D, `question_index`,
 `phase`, `is_correct`, `is_nota`, `confidence_class`), and `trace_labels_summary.json`.
