@@ -54,7 +54,6 @@ def with_ci(stat, n):
     return {**point, **{f"{k}_lo": v for k, v in zip(point, lo)}, **{f"{k}_hi": v for k, v in zip(point, hi)}}
 
 
-# A1
 def split_stats(g, phase):
     """Length and wait by outcome (1 = wrong in phase 1, abstained in phase 2): medians, means, difference, AUROC."""
     y_all = (1 - g.is_correct if phase == 1 else g.is_nota).to_numpy()
@@ -91,7 +90,6 @@ def length_by_checkpoint():
     return pd.DataFrame(rows)
 
 
-# A2 / A3
 def popqa_items():
     """log_s_pop and prop per Phase 1 question_index (the row position in the question file)."""
     q = pd.read_csv(POPQA_ITEMS)
@@ -153,7 +151,8 @@ def per_checkpoint_partials(L, tags, run_set):
 
 
 def item_vs_state():
-    """A2 coefficients and partials for the PopQA Think line and the Qwen SimpleQA proxy; A3 interaction and bins."""
+    """Item difficulty vs correctness as predictors of length: OLS coefficients and per-checkpoint partials for the
+    PopQA Think line and the Qwen SimpleQA runs; difficulty x correctness interaction and difficulty bins (PopQA)."""
     models, partials, bins = [], [], []
     for run_set, tags in [("think_popqa", THINK_POPQA), ("qwen_simpleqa", QWEN_SIMPLEQA_PROXY)]:
         popqa = run_set == "think_popqa"
@@ -203,8 +202,9 @@ def difficulty_bins(L, d):
     return rows
 
 
-# A5
 def sensitivity():
+    """Accuracy, abstention and abstain|wrong - abstain|right on all rows vs on the filtered rows; `moves` = the
+    filtered value lies outside the all-rows CI."""
     rows = []
     for run_set in ["think_popqa", "think_simpleqa"]:
         for tag in RUN_SETS[run_set]:
@@ -234,7 +234,6 @@ def sensitivity():
     return pd.DataFrame(rows)
 
 
-# A6
 CHECKPOINT_RUNS = ["olmo32b-popqa-think-sft-main", "olmo32b-popqa-think-dpo", "olmo32b-popqa-think-rl31-main"]
 
 
@@ -262,8 +261,8 @@ def flip_check():
     return pd.DataFrame(rows)
 
 
-# B1
 def verbal_coupling():
+    """Spearman of verbal-pass trace length with Phase 2 trace length, and with verbal confidence."""
     rows = []
     for run_set, tags in RUN_SETS.items():
         for tag in tags:
@@ -278,7 +277,6 @@ def verbal_coupling():
     return pd.DataFrame(rows)
 
 
-# B3
 ROUTE_RUNS = ["olmo32b-popqa-think-sft-main", "olmo32b-popqa-think-rl31-main", "80b-thinking"]
 
 

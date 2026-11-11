@@ -1,4 +1,4 @@
-"""Spec item 5: checkpoint-probe trajectories by trace label (Phase 2, sets A+B)."""
+"""Checkpoint-probe trajectories by trace label (Phase 2, sets A+B)."""
 import json
 import sys
 from pathlib import Path

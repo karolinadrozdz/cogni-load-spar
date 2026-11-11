@@ -12,7 +12,7 @@ experiment on emergent capabilities across training is a new task. It reuses eve
   function mounts it at `/cache`, so a run on a cached checkpoint starts without a download. **Do not delete it, or
   any repo inside it.** Re-downloading costs hours and GPU money, and other experiments use the same cache.
 - **Prefetch.** This downloads new checkpoints on CPU containers into the same cache. A GPU run that downloads bills
-  the GPU for the download (≈ 8 of a 14-minute base run):
+  the GPU for the download:
   ```
   modal run --detach abstention_modal.py::prefetch --specs "allenai/Olmo-3-1125-32B@stage1-step19000,allenai/Olmo-3-32B-Think"
   ```

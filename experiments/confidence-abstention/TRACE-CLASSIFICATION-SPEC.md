@@ -1,14 +1,12 @@
 # Spec: does the model ever judge its answer without re-solving the question?
 
 ## Why
-On Qwen3-Next-80B-A3B-Thinking, every Phase-2 abstention trace we have read re-derives an answer
-from scratch and abstains because that answer is "not among the options"; every "No chance" in the
-verbal pass re-derives an answer and rates the earlier one against it. That is recompute-and-compare,
-not a reading of confidence in the first answer. The question is whether the other kind exists at
-all — traces where the model judges its answer or the options *without* producing its own candidate —
-and, if it does, whether that kind tracks correctness differently. If the second kind is absent, the
-paper's two-stage architecture (confidence representation → threshold) has no second stage under
-thinking; it has a second first stage.
+A thinking model can reach a Phase-2 abstention or a verbal rating by re-deriving an answer from scratch
+and comparing it with the options or the earlier answer (recompute-and-compare), which is not a reading of
+confidence in the first answer. The question is whether the other kind exists — traces where the model
+judges its answer or the options *without* producing its own candidate — and, if it does, whether that
+kind tracks correctness differently. If the second kind is absent, the paper's two-stage architecture
+(confidence representation → threshold) has no second stage under thinking.
 
 ## Inputs
 `results/80b-thinking/phases.csv` and `results/80b-thinking/verbal.csv` (columns: `question`,
@@ -16,10 +14,10 @@ thinking; it has a second first stage.
 `reasoning_tokens`, `truncated`; verbal.csv adds `confidence_class`, `confidence_output`).
 Exclude `truncated == 1`.
 
-Traces to label (≈ 650):
-- A. Phase 2, `is_nota == 1`: all (≈ 207).
+Traces to label:
+- A. Phase 2, `is_nota == 1`: all.
 - B. Phase 2, `is_nota == 0`: a random sample of 200 (seed 0), stratified half correct / half incorrect.
-- C. Verbal pass, `confidence_class == "No chance"`: all (≈ 98).
+- C. Verbal pass, `confidence_class == "No chance"`: all.
 - D. Verbal pass, `confidence_class` in {"Highly likely", "Almost certain"}: random 100, stratified by `is_correct`.
 
 ## The labels (one per trace)
@@ -57,9 +55,7 @@ two kinds differ, a per-item Sonnet tiebreak call with both rationales shown dec
 `disagreed = 1`. Then a human reads 40 rows (10 per kind, random) and records agreement; report it. Do not
 tune the rubric to the traces after reading the results — if the rubric needs changing, change it, relabel
 everything, and say so.
-Regex route proxies do not separate the routes (the `none of the options|no correct answer|not among the
-options|not listed` pattern matches all 207 Qwen-80B abstentions, including 62/62 JUDGE); routes come from the
-judge pipeline only.
+Routes come from the judge pipeline; regex proxies are not used.
 
 Output: `results/80b-thinking/trace_labels.csv` (all fields above plus `set` A–D, `question_index`,
 `phase`, `is_correct`, `is_nota`, `confidence_class`), and `trace_labels_summary.json`.
@@ -80,7 +76,6 @@ Output: `results/80b-thinking/trace_labels.csv` (all fields above plus `set` A�
    - candidate incorrect → a *knowledge* error in the second solve, overriding a correct first solve
      when `is_correct == 1`;
    - `decision_reason == question_wrong` → the model disputes the item.
-   We already know 47% of "No chance" ratings sit on correct answers; this says which failure they are.
 4. **Instruction licensing.** Share of abstentions with `decision_reason == instruction_license`. If
    high, the Phase-2 framing ("some questions have no correct answer") is doing the work, and the
    reframed-prompt run is the control.

@@ -9,7 +9,7 @@ Stages, each its own `modal run`; outputs land in the abstention-results volume 
     # or, for a thinking checkpoint: pre-trace residuals (last token of the reasoning-mode Phase 2 prompt) on the
     # harness run's Phase 1 items, labelled by its k-sample consistency, then vectors.pt + eval_items.json
     modal run --detach steering_modal.py::pretrace --model allenai/Olmo-3.1-32B-Think --thinking native \
-        --harness-tag olmo32b-popqa-think-rl31-main
+        --harness-tag <harness tag>
     # reasoning mode at one layer: alphas x positions (start / think / post)
     modal run --detach steering_modal.py::reason --model Qwen/Qwen3-8B --thinking on --tag pilot --layer 17 --n 50
 
@@ -421,7 +421,7 @@ def run_notrace(model, tok, run, cfg, sweep=None, **build_kw):
 
 
 def run_pretrace(model, tok, run, cfg, sweep=None, n_eval_cell=150, **build_kw):
-    """Residuals at the last token of the reasoning-mode Phase 2 prompt (just before deliberation, POS-START), one
+    """Residuals at the last token of the reasoning-mode Phase 2 prompt (just before deliberation), one
     forward pass per harness Phase 1 item; labels from the harness run's k-sample consistency."""
     import numpy as np
     import torch

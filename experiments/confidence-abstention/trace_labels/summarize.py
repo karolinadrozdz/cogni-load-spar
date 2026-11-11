@@ -144,7 +144,7 @@ def main():
     df.reindex(columns=cols).to_csv(RUN / "trace_labels.csv")  # build_batches samples lack confidence_class, previous_answer
     s = summary(df, a, b)
     (RUN / "trace_labels_summary.json").write_text(json.dumps(s, indent=2, default=str))
-    # 40-row human audit: 10 per kind present, topped up from disagreed rows (no OTHER labels exist)
+    # 40-row human audit: 10 per kind present, topped up from disagreed rows
     audit = pd.concat([g.sample(min(10, len(g)), random_state=0) for _, g in df.groupby("kind")])
     rest = df[(df.disagreed == 1) & ~df.index.isin(audit.index)]
     audit = pd.concat([audit, rest.sample(min(40 - len(audit), len(rest)), random_state=0)])

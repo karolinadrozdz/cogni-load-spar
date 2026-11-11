@@ -77,7 +77,7 @@ def short_answer_measures(t):
 
 
 def short_answer_gates(m, lo):
-    """Accuracy only means knowledge where the model answers in the short format (base checkpoints ramble)."""
+    """Accuracy only measures knowledge where the model answers in the short format."""
     return dict(gate_format=bool(m["short_format"] >= 0.9 and m["truncated"] < 0.05))
 
 

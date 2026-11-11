@@ -105,7 +105,7 @@ def test_e2e(model, tok):
     import analyze_steering
     run = Path(tempfile.mkdtemp()) / "steer-Qwen3-0.6B-local"
     run.mkdir(parents=True)
-    # Qwen3-0.6B abstains on ~90% of Phase 2 prompts, so ~20 of 300 construction trials are correct: groups of 4
+    # few construction trials are correct on Qwen3-0.6B, so groups of 4
     cfg = dict(model=MODEL, thinking="on", questions="popqa", n=300, batch=16)
     sm.run_notrace(model, tok, run, cfg, sweep=[10, 14], n_group=4, n_eval_cell=6)
     vecs = torch.load(run / "vectors.pt")

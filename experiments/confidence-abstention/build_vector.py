@@ -58,7 +58,7 @@ def directions(h, layers, pos, high, low, scale_rows, norm_frac=0.03):
     noise = torch.randn(h.shape[-1], generator=torch.Generator().manual_seed(0))
     raw = diff(high, low)
     real = unit(raw)
-    # high-variance dimensions leave the shuffled difference correlated with the real one at late layers
+    # orthogonalised so the control shares no component with the real direction
     shuffled = unit({L: d - (d @ real[L]) * real[L] for L, d in diff(*pseudo).items()})
     return dict(layers=layers, real=real, shuffled=shuffled, random={L: noise / noise.norm() for L in layers},
                 scale={L: norm_frac * float(h[k, scale_rows].norm(dim=-1).mean()) for k, L in enumerate(layers)},

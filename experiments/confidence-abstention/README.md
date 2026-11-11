@@ -83,8 +83,7 @@ Everything the analysis needs is in `results/<tag>/` (`phases.csv`, `verbal.csv`
 `params.json`); the raw reasoning traces are in the `reasoning` column of both CSVs.
 
 ## In-trace checkpoints
-After a thinking trace the answer-digit distribution is one-hot (prob > 0.999 on the chosen option
-for every question): the decision was made in the text. This reads confidence *during* the trace instead.
+The main run reads the answer-digit distribution after the trace has finished. This reads it *during* the trace.
 ```
 modal run --detach abstention_modal.py::checkpoints --tag 80b-thinking --gpu H200:2   # needs <tag>/phases.csv in the volume
 modal volume get abstention-results 80b-thinking results/
@@ -99,9 +98,9 @@ Options: `--phases 1,2`, `--every 256`, `--max-checkpoints 20`, `--n 0` (0 = all
 first k tokens, appends `\n</think>\n\n` and reads the digit logprobs of the next token ("if you had to answer
 now"), exactly as the main run does. Checkpoints (`kind`): `start` (empty trace), `fixed` (every `--every` tokens),
 `marker` (just before a backtrack word: wait, actually, hmm, hold on, let me recheck/reconsider/rethink/double-check/think again,
-on second thought, "no,") and `end` (full trace). Traces carry ~30 markers, mostly early, so of the `--max-checkpoints`
-slots two go to `start`/`end`, half the rest to evenly spaced `fixed` points and the remainder to markers thinned
-evenly along the trace (default 20 → about 9 fixed + 9 markers per trace).
+on second thought, "no,") and `end` (full trace). Of the `--max-checkpoints` slots, two go to `start`/`end`, half the
+rest to evenly spaced `fixed` points and the remainder to markers thinned evenly along the trace, so clustered markers
+cannot take every slot (default 20 → about 9 fixed + 9 markers per trace).
 
 `TRACE-CLASSIFICATION-SPEC.md` is the companion no-GPU analysis: label traces as re-solve-and-compare vs
 judge-without-re-solving, and cross-check the labels against the checkpoint trajectories (`trace_labels/` below).
@@ -165,10 +164,9 @@ Code and data adapted from Kumaran et al. (2026), OSF `resw4` (code MIT, data CC
   (T=0.6, top-p 0.95, top-k 20, fixed seed) and a 4096-token budget, because greedy decoding of
   long traces degenerates. `--thinking off` runs are greedy with a 4-token budget. `--temperature 0` forces greedy.
 - **Where the logprobs come from.** Paper: the first output token after `Answer:`. Here: the first
-  non-whitespace token after `</think>`. With thinking on, that distribution is expected to be
-  near one-hot (the trace already commits to an answer), so `calibrated` in `analyze.py` will
-  look uninformative in thinking runs. That is a finding, not a bug; the hybrid `off`/`on` pair
-  is how to keep the paper's calibrated measure while varying thinking.
+  non-whitespace token after `</think>`. With thinking on, the trace can already state the answer, so that
+  distribution can be near one-hot and `calibrated` in `analyze.py` uninformative; the hybrid `off`/`on` pair
+  keeps the paper's calibrated measure while varying thinking.
 - **Verbal confidence.** Paper: 10-token budget, "NO REASONING". A thinking model reasons
   anyway; the class is parsed from the post-`</think>` content only, and the trace is saved.
 - **Phase 4.** The prompt asks the model to rate its confidence "internally"; with thinking on
@@ -179,7 +177,7 @@ Code and data adapted from Kumaran et al. (2026), OSF `resw4` (code MIT, data CC
 
 ## Reading `analyze.py`
 - `P1_auroc_correct`: `cal` (temperature-scaled, τ fit on Phase 0), `raw`, `verbal`, with a
-  bootstrap CI on `cal − verbal`. Paper: cal > verbal. `frac_cal_above_0.99` shows the collapse.
+  bootstrap CI on `cal − verbal`. Paper: cal > verbal. `frac_cal_above_0.99` measures saturation of `cal`.
   Thinking runs also report the trace's own signal (`neg_reasoning_tokens`, `neg_wait_count`).
 - `P2_abstention`: Phase-2 abstention rate (paper: 27–82% across models; they dropped a model at 4%),
   abstention split by whether the Phase-1 answer was correct, and the nested logistic LR tests

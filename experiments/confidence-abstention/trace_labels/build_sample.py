@@ -1,4 +1,4 @@
-"""Draw sets A-D from the 80b-thinking run and write judge batches (spec: TRACE-CLASSIFICATION-SPEC.md)."""
+"""Draw sets A-D from the 80b-thinking run and write judge batches (set definitions: TRACE-CLASSIFICATION-SPEC.md)."""
 import json
 import sys
 from pathlib import Path

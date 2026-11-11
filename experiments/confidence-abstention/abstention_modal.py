@@ -35,7 +35,7 @@ Outputs (confidence_abstention; other tasks write their own CSVs) land in the `a
                 so its presence means the run is complete
 In-trace confidence checkpoints on a finished thinking run (reads <tag>/phases.csv, writes
 checkpoints.csv + checkpoints_params.json; see README):
-    modal run --detach abstention_modal.py::checkpoints --tag 80b-thinking --gpu H200:2
+    modal run --detach abstention_modal.py::checkpoints --tag <tag> --gpu H200:2
 Entrypoints main, checkpoints, start_format and prefetch: Modal needs the explicit ::<name> form.
 Overnight: `modal run --detach abstention_modal.py::main ...` keeps the job alive after the laptop sleeps; `./handoff.sh <tag>`
 waits for params.json, fetches the directory and re-runs analyze.py locally.
@@ -54,8 +54,7 @@ RESULTS_VOLUME = os.environ.get("ABSTENTION_RESULTS_VOLUME", "abstention-results
 
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu22.04", add_python="3.12")
-    # spec kept byte-identical to the original so Modal reuses the cached image (vllm 0.32.0); a rebuild
-    # pulls nvidia-cutlass-dsl 4.8.1, whose bytecode fails to load ("bad marshal data")
+    # do not edit: any change rebuilds the cached image (vllm 0.32.0), and a rebuild pulls a nvidia-cutlass-dsl that fails to load
     .uv_pip_install("vllm>=0.11", "pandas", "numpy", "scipy", "scikit-learn", "statsmodels",
                     "huggingface_hub[hf_transfer]")
     .env({"HF_HOME": "/cache/hf", "HF_HUB_ENABLE_HF_TRANSFER": "1",
@@ -249,8 +248,8 @@ def thin(xs, k):
 
 def select_checkpoints(reasoning, tok, every, max_checkpoints, regex=MARKER_RE):
     """Token positions (probe = first `token_pos` trace tokens) of start / fixed / marker / end checkpoints.
-    Traces have ~30 markers, nearly all early, so half the slots are reserved for fixed intervals and the
-    markers are thinned evenly along the trace rather than taken earliest-first."""
+    Half the slots are reserved for fixed intervals and the markers are thinned evenly along the trace,
+    so clustered markers cannot take every slot."""
     enc = tok(reasoning, add_special_tokens=False, return_offsets_mapping=True)
     T, ends = len(enc.input_ids), [e for _, e in enc.offset_mapping]
     marks = {}  # position of the token containing the marker's first character -> marker text
@@ -363,7 +362,7 @@ class ConfidenceAbstention:
         phase_list = [int(p) for p in f["phases"].split(",")]
         if f["thinking"] == "base" and not f["base_phase2_verbal"]:  # base checkpoints cannot follow the instruction
             phase_list = [p for p in phase_list if p in (0, 1)]
-        # key order is the params.json layout of every existing run
+        # key order fixes the params.json layout
         return dict(model=f["model"], thinking=f["thinking"], n=f["n"], phases=phase_list,
                     thresholds=list(range(0, 101, 10)), budget=f["budget"], max_model_len=f["max_model_len"],
                     temperature=f["temperature"], seed=f["seed"], phase2_prompt=f["phase2_prompt"], tp=f["tp"],
@@ -554,8 +553,8 @@ def parse_task_opts(s, defaults):
 
 # ---- experiment ---------------------------------------------------------------------
 
-# retries: containers intermittently read corrupt site-packages files at startup ("bad marshal data",
-# "null bytes"), different file each time; a fresh container fixes it
+# retries: containers intermittently read a corrupt site-packages file at startup ("bad marshal data");
+# a fresh container succeeds
 @app.function(volumes={"/cache": cache, "/results": results}, secrets=[hf_secret], timeout=8 * 60 * 60,
               memory=65536, retries=modal.Retries(max_retries=2, initial_delay=10.0))
 def run(cfg: dict) -> str:
@@ -566,7 +565,7 @@ def run(cfg: dict) -> str:
     import vllm
     from vllm import LLM
 
-    # confidence configs carry no "task" key, so their params.json stays the layout of every earlier run
+    # confidence_abstention configs carry no "task" key
     task = TASKS[cfg.get("task", "confidence_abstention")]
     llm = LLM(model=cfg["model"], revision=cfg["revision"], tokenizer_revision=cfg["revision"], dtype=cfg["dtype"],
               tensor_parallel_size=cfg["tp"], max_model_len=cfg["max_model_len"],
@@ -796,15 +795,15 @@ def start_probe(cfg: dict) -> str:
 
 @app.local_entrypoint()
 def start_format(tag: str, gpu: str = "H200", phases: str = "1,2", prefixes: str = "Answer: |The answer is "):
-    """modal run --detach abstention_modal.py::start_format --tag olmo32b-popqa-think-rl31-main --gpu H200"""
+    """modal run --detach abstention_modal.py::start_format --tag <tag> --gpu H200"""
     cfg = dict(tag=tag, phases=[int(p) for p in phases.split(",")], prefixes=[p for p in prefixes.split("|") if p],
                tp=int(gpu.split(":")[1]) if ":" in gpu else 1)
     call = start_probe.with_options(gpu=gpu).spawn(cfg)  # spawn, don't wait (see main)
     print(f"spawned start_format {cfg['tag']}: {call.object_id}")
 
 
-# Weights are 60-130 GB per checkpoint; fetching them inside a GPU run bills the GPU for the whole download
-# (~8.5 min of a ~14 min base run). Prefetch on CPU containers into the same HF cache the GPU runs read.
+# Weights are 60-130 GB per checkpoint; fetching them inside a GPU run bills the GPU for the whole download.
+# Prefetch on CPU containers into the same HF cache the GPU runs read.
 @app.function(volumes={"/cache": cache}, secrets=[hf_secret], timeout=3 * 60 * 60, cpu=8, memory=16384)
 def fetch(model: str, revision: str) -> str:
     os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"

@@ -1,9 +1,9 @@
 # Spec: confidence steering with and without a reasoning trace
 
 Question: Kumaran et al. (2026, NMI) show that adding a confidence direction to the residual stream shifts abstention
-in a no-CoT model (Gemma 3 27B: 66.5% → 7.0% across the steering range, layer ~31 of 62). Our labels and prompt
-ablations say that with a trace, abstention is instead the outcome of re-deriving an answer and comparing it with the
-options. This experiment tests whether a confidence direction still governs abstention once the model deliberates.
+in a no-CoT model (Gemma 3 27B: 66.5% → 7.0% across the steering range, layer ~31 of 62). With a trace, abstention
+could instead be the outcome of re-deriving an answer and comparing it with the options. This experiment tests whether
+a confidence direction still governs abstention once the model deliberates.
 
 Design in one line: Instruct carries the paper's pathway (positive control, same base); Think carries the trace; within
 Think, the question is whether a pre-deliberation confidence direction changes what happens when the model then
@@ -37,7 +37,7 @@ debug before running reasoning mode.
 Base family: Olmo-3.1-32B (dense, open; 64 layers, hidden size 5120, mixed sliding/full attention).
 
 - **Primary: Olmo-3.1-32B-Think** (`allenai/Olmo-3.1-32B-Think`, main = RL step 2300), **reasoning mode** (native
-  thinking). Already characterised by the harness run `results/olmo32b-popqa-think-rl31-main` (T = 0.6, seed 42, budget
+  thinking). Harness run: `results/olmo32b-popqa-think-rl31-main` (T = 0.6, seed 42, budget
   8,192, k = 5 Phase 1 samples in `k_answers`, judge labels, in-trace probe). Olmo-3 has no think special tokens: the
   generation prompt ends in `<|im_start|>assistant\n<think>` as plain text, and `</think>` tokenizes as ordinary pieces
   that merge with neighbours (`</`=524, `think`=27963, `>`=29; `.</`=4005), so the hook detects the closing tag on the
@@ -71,15 +71,14 @@ Instruct (and the Think secondary arm), the paper's construction:
 Think (reasoning mode), from the harness run `results/olmo32b-popqa-think-rl31-main`:
 
 - **Labels:** k-sample consistency, the number of the item's 5 Phase 1 `k_answers` equal to `gt_position`. Sample 1 is
-  the Phase 1 answer (`k_answers[0] == final_answer` on all 1,000 items; the other four use seed + 1).
+  the Phase 1 answer (the other four use seed + 1).
   high = 5/5; low = 1–4/5 and Phase 1 correct, i.e. sample 1 correct and 1–3 of the other four wrong. Both groups are
   Phase 1-correct, as in the paper's correct-only construction: the contrast is "knows it reliably" vs "knows it
   unreliably". mixed = 1–4/5 regardless of Phase 1 correctness (a secondary validity contrast); 0/5 is used in neither.
 - **Evaluation set:** 300 Phase 1 items, seed 0, stratified 150 correct / 150 incorrect by the harness run's Phase 1
-  correctness, stored in shuffled order. By label: 129 high, 111 mixed, 60 none; 205 of 300 abstain in the harness
-  run's Phase 2.
-- **Vector-building set:** the remaining 700 Phase 1 items (489 high; 160 mixed, of which 105 low; 51 none). Separate
-  from the evaluation items, as in the paper; it uses Phase 1 questions because the labels need the k samples.
+  correctness, stored in shuffled order.
+- **Vector-building set:** the remaining 700 Phase 1 items. Separate from the evaluation items, as in the paper; it
+  uses Phase 1 questions because the labels need the k samples.
 
 ## 3. Steering vectors
 
@@ -118,8 +117,7 @@ low        = n items labelled low (1–4/5, Phase 1 correct), the same draw
 v_L, v̂_L, scale_L, steer(α) as in 3.1 (scale_L over the 700 vector-building items)
 ```
 
-On the harness run n = 70 (cap 19; the low pool has 105 items, 19–32 per gt_position). Groups larger than the paper's
-25: the labels are readout-free and noisier than the paper's margins.
+Groups are larger than the paper's 25 because the labels are readout-free and noisier than the paper's margins.
 
 **L* (Think)**: 5-fold cross-validation within the vector-building set (folds over its 700 items, seed 0). In each
 fold the direction is mean(high) − mean(low) over all training-fold high and low items, and the held-out fold's high
@@ -165,7 +163,7 @@ L* (Think) as in 3.2; all layers reported. At L* (plus L* − 8 and L* + 8 at α
   generation only through that position's KV entries, so its effect may be weak in a long trace.
 - **POS-THINK**: add at that position and every generated position through the closing think tag. The main condition.
 - **POS-POST**: add only at generated positions after the closing think tag. Tests whether the post-trace answer
-  position still reads the signal (expected small; the readout there is saturated).
+  position still reads the signal (expected small).
 
 Controls: `random` and `shuffled` at POS-THINK, α = ±2.
 
