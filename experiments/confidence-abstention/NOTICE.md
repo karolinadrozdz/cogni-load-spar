@@ -16,3 +16,7 @@ This directory adapts the experimental code and data released with:
   SimpleQA (Wei et al., 2024, OpenAI). `data/README-osf.md` is the authors' README, unmodified.
 
 `analyze.py` and `handoff.sh` are ours; the statistics they compute follow the paper's Methods.
+
+`steering_modal.py` and `build_vector.py` follow the paper's steering recipe (confidence direction from high- vs low-margin
+correct trials, added at 3% of the mean residual norm at the steered layer) and use its Phase 2 prompt. The
+reasoning-mode vector uses the same difference-of-means construction with labels from k-sample consistency.
