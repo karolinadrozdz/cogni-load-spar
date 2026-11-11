@@ -1,0 +1,41 @@
+split,question,answer
+shot,What is the capital of Italy?,Rome
+shot,How many legs does a spider have?,8|eight
+shot,Who wrote the play Hamlet?,William Shakespeare|Shakespeare
+shot,What is the chemical symbol for gold?,Au
+test,What is the capital of France?,Paris
+test,What is the largest planet in the Solar System?,Jupiter
+test,Who painted the Mona Lisa?,Leonardo da Vinci|da Vinci|Leonardo
+test,What is the chemical symbol for sodium?,Na
+test,How many sides does a hexagon have?,6|six
+test,What is the capital of Japan?,Tokyo
+test,Who developed the theory of general relativity?,Albert Einstein|Einstein
+test,What is the boiling point of water at sea level in degrees Celsius?,100|one hundred
+test,Which element has atomic number 1?,Hydrogen
+test,What is the longest river in Africa?,Nile|the Nile|Nile River
+test,In which year did World War II end?,1945
+test,What is the capital of Australia?,Canberra
+test,Who wrote Pride and Prejudice?,Jane Austen|Austen
+test,What is the square root of 144?,12|twelve
+test,Which planet is known as the Red Planet?,Mars
+test,What is the hardest natural substance?,Diamond
+test,Who was the first person to walk on the Moon?,Neil Armstrong|Armstrong
+test,What is the currency of the United Kingdom?,Pound sterling|pound|pounds|sterling|British pound
+test,What gas do plants absorb from the atmosphere for photosynthesis?,Carbon dioxide|CO2
+test,What is the capital of Canada?,Ottawa
+test,How many continents are there?,7|seven
+test,Who composed the Fifth Symphony that opens with four famous notes?,Ludwig van Beethoven|Beethoven
+test,What is the smallest prime number?,2|two
+test,What is the capital of Egypt?,Cairo
+test,What language has the most native speakers?,Mandarin Chinese|Mandarin|Chinese
+test,What is the freezing point of water in degrees Fahrenheit?,32|thirty-two
+test,Who discovered penicillin?,Alexander Fleming|Fleming
+test,What is the largest ocean on Earth?,Pacific Ocean|Pacific
+test,What is the capital of Kenya?,Nairobi
+test,How many minutes are in a day?,1440
+test,Which organ pumps blood through the human body?,Heart|the heart
+test,What is the tallest mountain above sea level?,Mount Everest|Everest
+test,Who wrote the novel 1984?,George Orwell|Orwell
+test,What is the capital of Brazil?,Brasília|Brasilia
+test,What is 15 multiplied by 4?,60|sixty
+test,What is the main language spoken in Argentina?,Spanish

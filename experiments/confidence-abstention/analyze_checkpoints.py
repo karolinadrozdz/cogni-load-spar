@@ -115,5 +115,33 @@ report["abstention_onset"] = {"n_abstained_traces": int(p2.question_index.nuniqu
                               "onset_frac": quart(onset),
                               "frac_with_answer_1_to_4_at_start": round(float((start != 5).mean()), 3) if len(start) else None}
 
+
+def sustained_onset(g):
+    """frac of the first checkpoint with forced 5 followed only by 5s (NaN if the trace does not end on 5)."""
+    five = (g.forced_answer == 5).to_numpy()
+    if not five[-1]:
+        return np.nan
+    i = len(five) - 1
+    while i > 0 and five[i - 1]:
+        i -= 1
+    return g.frac.to_numpy()[i]
+
+
+# phase 2: is a forced 5 at token 0 specific to traces that end up abstaining?
+all2 = df[df.phase == 2]
+s2 = all2[all2.kind == "start"].set_index("question_index")
+s2 = s2.assign(five=(s2.forced_answer == 5).astype(int))
+p1_correct = pd.read_csv(d / "phases.csv").query("phase == 1").set_index("question_index").is_correct
+s2["p1_correct"] = s2.index.map(p1_correct)
+ab, an = s2[s2.is_nota == 1], s2[s2.is_nota == 0]
+rate = lambda x: {"p": round(float(x.five.mean()), 3), "n": len(x)} if len(x) else {"n": 0}
+report["start_forced_5"] = {
+    "given_abstained": rate(ab), "given_answered": rate(an),
+    "auroc_prob_5_at_start_abstain": auroc(s2.is_nota, s2.prob_5),
+    "given_abstained_p1_wrong": rate(ab[ab.p1_correct == 0]), "given_abstained_p1_right": rate(ab[ab.p1_correct == 1]),
+    "onset_sustained_abstained": quart(all2[all2.is_nota == 1].groupby("question_index").apply(sustained_onset,
+                                                                                               include_groups=False)),
+    "commitment_answered": quart(tr[(tr.phase == 2) & (tr.is_nota == 0)].commit)}
+
 (d / "checkpoints_analysis.json").write_text(json.dumps(report, indent=2, default=str))
 print(json.dumps(report, indent=2, default=str))

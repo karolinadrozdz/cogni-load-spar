@@ -1,0 +1,53 @@
+1	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step1000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step001000
+1	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step2000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step002000
+1	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step5000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step005000
+1	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step8000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step008000
+1	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step11000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step011000
+2	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step19000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step019000
+2	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step34000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step034000
+2	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step62000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step062000
+2	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step112000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step112000
+2	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step202000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step202000
+3	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step364000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step364000
+3	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage1-step656000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-s1-step656000
+3	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --revision stage2-ingredient1+2-step23842 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-midtrain-merge
+3	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-base-main
+4	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Instruct-SFT --thinking off --dtype bfloat16 --questions popqa --gpu H200 --tag olmo32b-popqa-instruct-sft
+4	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Instruct-DPO --thinking off --dtype bfloat16 --questions popqa --gpu H200 --tag olmo32b-popqa-instruct-dpo
+4	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Instruct --thinking off --questions popqa --gpu H200 --tag olmo32b-popqa-instruct-rl
+5	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-SFT --revision 1e-4-step2000 --thinking native --budget 8192 --max-model-len 12288 --questions popqa --gpu H200 --tag olmo32b-popqa-think-sft-1e-4-step2000
+5	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-SFT --revision 1e-4-step6000 --thinking native --budget 8192 --max-model-len 12288 --questions popqa --gpu H200 --tag olmo32b-popqa-think-sft-1e-4-step6000
+5	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-SFT --thinking native --budget 8192 --max-model-len 12288 --k-samples 5 --questions popqa --gpu H200 --tag olmo32b-popqa-think-sft-main
+5	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-DPO --thinking native --budget 8192 --max-model-len 12288 --k-samples 5 --questions popqa --gpu H200 --tag olmo32b-popqa-think-dpo
+5	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think --revision step_050 --thinking native --budget 8192 --max-model-len 12288 --questions popqa --gpu H200 --tag olmo32b-popqa-think-rl-step0050
+6	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think --revision step_250 --thinking native --budget 8192 --max-model-len 12288 --questions popqa --gpu H200 --tag olmo32b-popqa-think-rl-step0250
+6	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think --revision step_500 --thinking native --budget 8192 --max-model-len 12288 --questions popqa --gpu H200 --tag olmo32b-popqa-think-rl-step0500
+6	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think --thinking native --budget 8192 --max-model-len 12288 --questions popqa --gpu H200 --tag olmo32b-popqa-think-rl-main
+6	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Think --revision step_1100 --thinking native --budget 8192 --max-model-len 12288 --questions popqa --gpu H200 --tag olmo32b-popqa-think-rl31-step1100
+6	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Think --revision step_1500 --thinking native --budget 8192 --max-model-len 12288 --questions popqa --gpu H200 --tag olmo32b-popqa-think-rl31-step1500
+7	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Think --revision step_1900 --thinking native --budget 8192 --max-model-len 12288 --questions popqa --gpu H200 --tag olmo32b-popqa-think-rl31-step1900
+7	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Think --thinking native --budget 8192 --max-model-len 12288 --k-samples 5 --questions popqa --gpu H200 --tag olmo32b-popqa-think-rl31-main
+8	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Instruct-SFT --thinking base --dtype bfloat16 --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-instruct-sft
+8	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Instruct-DPO --thinking base --dtype bfloat16 --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-instruct-dpo
+8	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Instruct --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-instruct-rl
+8	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-SFT --revision 1e-4-step2000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-sft-1e-4-step2000
+8	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-SFT --revision 1e-4-step6000 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-sft-1e-4-step6000
+9	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-SFT --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-sft-main
+9	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-DPO --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-dpo
+9	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think --revision step_050 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-rl-step0050
+9	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think --revision step_250 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-rl-step0250
+9	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think --revision step_500 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-rl-step0500
+10	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-rl-main
+10	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Think --revision step_1100 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-rl31-step1100
+10	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Think --revision step_1500 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-rl31-step1500
+10	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Think --revision step_1900 --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-rl31-step1900
+10	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Think --thinking base --questions popqa --gpu H200 --tag olmo32b-popqa-bridge-think-rl31-main
+11	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-1125-32B --thinking base --gpu H200 --tag olmo32b-base-main
+11	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Instruct --thinking off --gpu H200 --tag olmo32b-instruct-rl
+11	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-SFT --thinking native --budget 8192 --max-model-len 12288 --gpu H200 --tag olmo32b-think-sft-main
+11	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think-DPO --thinking native --budget 8192 --max-model-len 12288 --gpu H200 --tag olmo32b-think-dpo
+11	modal run --detach abstention_modal.py::main --model allenai/Olmo-3-32B-Think --thinking native --budget 8192 --max-model-len 12288 --gpu H200 --tag olmo32b-think-rl-main
+11	modal run --detach abstention_modal.py::main --model allenai/Olmo-3.1-32B-Think --thinking native --budget 8192 --max-model-len 12288 --gpu H200 --tag olmo32b-think-rl31-main
+12	modal run --detach abstention_modal.py::checkpoints --tag olmo32b-popqa-think-sft-main --gpu H200
+12	modal run --detach abstention_modal.py::checkpoints --tag olmo32b-popqa-think-dpo --gpu H200
+12	modal run --detach abstention_modal.py::checkpoints --tag olmo32b-popqa-think-rl31-main --gpu H200

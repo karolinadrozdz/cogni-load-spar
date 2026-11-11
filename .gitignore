@@ -9,3 +9,6 @@ __pycache__/
 results/
 *.pt
 .DS_Store
+
+# Modal client output (local paths, app ids)
+experiments/confidence-abstention/logs/

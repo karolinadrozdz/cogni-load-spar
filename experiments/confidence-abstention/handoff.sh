@@ -20,4 +20,5 @@ mkdir -p results
 rm -rf "results/$tag"
 modal volume get "$vol" "$tag" results/
 echo "fetched results/$tag:"; ls -la "results/$tag"
-python analyze.py "results/$tag"
+# analyze.py is the confidence_abstention analysis; other tasks' analysis.json is computed in the container
+if [ -f "results/$tag/phases.csv" ]; then python analyze.py "results/$tag"; fi

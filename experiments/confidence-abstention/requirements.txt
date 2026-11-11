@@ -1,7 +1,13 @@
-# local: launching runs, fetching results, analyze.py. GPU-side deps live in the Modal image.
+# local: launching runs, fetching results, analysis, trace labelling. GPU-side deps live in the Modal images.
 modal>=1.0
 pandas
 numpy
 scipy
 scikit-learn
 statsmodels
+# build_popqa_mc.py
+huggingface_hub
+# build_vector.py, test_steering_local.py; pinned to the steering image
+torch==2.8.0
+transformers==4.57.6
+accelerate
