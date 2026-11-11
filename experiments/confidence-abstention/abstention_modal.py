@@ -24,7 +24,7 @@ columns: reasoning, reasoning_tokens, wait_count, truncated, parse_method, think
 --questions        simpleqa (data/phase{0,1}_questions.csv) or popqa (data/popqa_phase{0,1}_questions.csv).
 --k-samples N      N Phase 1 answers per question (the first is the usual one); adds k_answers, consistency.
 --dtype            vLLM dtype (default auto); bfloat16 for checkpoints stored in float32 (Olmo-3.1-32B-Instruct-SFT/-DPO).
---task             confidence_abstention (default; everything above) or another task in TASKS, e.g. short_answer;
+--task             confidence_abstention (default; everything above) or a task in tasks/, e.g. short_answer;
                    --task-opts "k=v,..." sets that task's options. Writing a new task: TASKS.md.
 
 Outputs (confidence_abstention; other tasks write their own CSVs) land in the `abstention-results` volume under <tag>/:
@@ -36,7 +36,7 @@ Outputs (confidence_abstention; other tasks write their own CSVs) land in the `a
 In-trace confidence checkpoints on a finished thinking run (reads <tag>/phases.csv, writes
 checkpoints.csv + checkpoints_params.json; see README):
     modal run --detach abstention_modal.py::checkpoints --tag <tag> --gpu H200:2
-Entrypoints main, checkpoints, start_format and prefetch: Modal needs the explicit ::<name> form.
+Entrypoints main, checkpoints, start_format, prefetch and check_tasks: Modal needs the explicit ::<name> form.
 Overnight: `modal run --detach abstention_modal.py::main ...` keeps the job alive after the laptop sleeps; `./handoff.sh <tag>`
 waits for params.json, fetches the directory and re-runs analyze.py locally.
 """
@@ -62,6 +62,8 @@ image = (
     .add_local_dir(Path(__file__).parent / "data", "/data")
     .add_local_file(Path(__file__).parent / "analyze.py", "/analyze.py")
 )
+# plus tasks/ and analyze.py's helpers, mounted at container start (copy=False): the same cached image
+run_image = image.add_local_python_source("tasks", "analyze")
 app = modal.App("confidence-abstention", image=image)
 cache = modal.Volume.from_name("abstention-hf-cache", create_if_missing=True)
 results = modal.Volume.from_name(RESULTS_VOLUME, create_if_missing=True)
@@ -190,6 +192,55 @@ def softmax(d):
 QUESTION_FILES = {"simpleqa": "phase{}_questions.csv", "popqa": "popqa_phase{}_questions.csv"}
 
 
+# ---- multiple-choice items and digit readout (any 4-way MC task; TASKS.md) ------------------------
+
+def mc_items(path):
+    """An MC question file (choice_1 is the answer) and each row's fixed option arrangement (seed 1042).
+    Arrangements cover the whole file, so the first n items are arranged the same at every --n."""
+    import pandas as pd
+    df = pd.read_csv(path)
+    return df, arrangements(len(df))
+
+
+def arranged_choices(df, arr, i):
+    """Options of row i in arranged order, the answer's arranged position (1-4), and the order."""
+    row = df.iloc[i]
+    order, gt = arr[i]
+    return [row[f"choice_{k + 1}"] for k in order], gt, order
+
+
+def mc_item_fields(i, q, c, gt, order):
+    """phases.csv's item columns."""
+    return dict(question_index=i, question=q, **{f"choice_{k + 1}_arranged": c[k] for k in range(4)},
+                gt_position=gt, arrangement_order=str(order))
+
+
+def digit_readout(g, valid, gt):
+    """phases.csv's answer columns for one generation, and the digit logprobs: the parsed answer digit plus the
+    logprob and softmax confidence of each valid digit at the first content token (5 = none of these)."""
+    lps = digit_logprobs(g["top"], valid)
+    conf = softmax(lps)
+    ans, how = parse_answer(g["content"], lps, valid)
+    row = dict(generated_text=g["content"], final_answer=ans, is_correct=int(int(ans) == gt),
+               is_nota=int(ans == "5"), logprob_chosen=lps[int(ans)],
+               **{f"logprob_choice_{k}": lps[k] for k in range(1, 5)},
+               **{f"confidence_{k}": conf[k] for k in range(1, 5)})
+    if 5 in valid:
+        row.update(logprob_nota=lps[5], confidence_5=conf[5])
+    row.update(parse_method=how)
+    return row, lps
+
+
+def digit_entropy_second(lps):
+    """Entropy (nats) of the softmax over the valid digits, and the runner-up digit with its probability."""
+    import numpy as np
+    conf = softmax(lps)
+    p = np.array(list(conf.values()))
+    second = sorted(conf, key=conf.get)[-2]
+    return dict(digit_entropy=float(-(p * np.log(p)).sum()), second_choice=str(second),
+                confidence_second=float(conf[second]))
+
+
 def split_think(ids, tok, thinking_active, finish_reason):
     """Split generated ids at the first "</think>" of the decoded text. Matches the string, not a token id,
     because Olmo's </think> is three ordinary tokens that merge with their neighbours (".</", ">\\n\\n").
@@ -292,24 +343,36 @@ class Context:
         """--budget when the model thinks, else the task's own answer length."""
         return self.cfg["budget"] if self.thinking_active else answer_tokens
 
-    def render(self, prompt):
+    def render(self, prompt, prefix=""):
+        """A user prompt, or a list of {"role": "system"|"user"|"assistant", "content"} messages ending in a user
+        turn, as the text the model continues. `prefix` is prefilled as the start of the assistant turn."""
         if self.base:
-            return prompt
-        return self.tok.apply_chat_template([{"role": "user", "content": prompt}], tokenize=False,
-                                            add_generation_prompt=True, **self.template_kw)
+            assert isinstance(prompt, str), "--thinking base has no chat template to render messages with"
+            return prompt + prefix
+        messages = [{"role": "user", "content": prompt}] if isinstance(prompt, str) else prompt
+        assert messages[-1]["role"] == "user", "the turn to generate is the assistant's; prefill it with prefix"
+        return self.tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True,
+                                            **self.template_kw) + prefix
 
-    def generate(self, prompts, max_tokens, **overrides):
-        """All samples per prompt (one unless overrides set n), each a dict from split()."""
+    def generate(self, prompts, max_tokens, prefix="", **overrides):
+        """All samples per prompt (one unless overrides set n), each a dict from split(). `prefix` is prefilled
+        (render); content and reasoning are the generated text only, without it."""
         from vllm import SamplingParams
-        outs = self.llm.generate([self.render(p) for p in prompts],
+        outs = self.llm.generate([self.render(p, prefix) for p in prompts],
                                  SamplingParams(max_tokens=max_tokens, **{**self.sampling, **overrides}))
-        return [[self.split(c) for c in o.outputs] for o in outs]
+        # a prefix that closes the think block leaves only content to generate
+        return [[self.split(c, closed="</think>" in prefix) for c in o.outputs] for o in outs]
 
-    def split(self, out):
-        """Separate the <think> block from the content; return the first content token's top logprobs."""
+    def split(self, out, closed=False):
+        """Separate the <think> block from the content; return the first content token's top logprobs.
+        closed: the prompt already closed the think block, so the whole generation is content."""
         tok, ids = self.tok, list(out.token_ids)
-        k, reasoning, content, reasoning_tokens, truncated = split_think(ids, tok, self.thinking_active,
-                                                                         out.finish_reason)
+        if closed:
+            k, reasoning, reasoning_tokens, truncated = 0, "", 0, 0
+            content = tok.decode(ids, skip_special_tokens=True).strip()
+        else:
+            k, reasoning, content, reasoning_tokens, truncated = split_think(ids, tok, self.thinking_active,
+                                                                             out.finish_reason)
         j = k
         while j < len(ids) and tok.decode([ids[j]]).strip() == "":
             j += 1
@@ -345,8 +408,8 @@ def default_tag(f, suffix=""):
 
 
 # ---- tasks -----------------------------------------------------------------------------------------
-# A task lives in this file because `modal run abstention_modal.py::main` ships only this file to the container
-# (plus the image's /data and /analyze.py). Interface and a worked example: TASKS.md.
+# confidence_abstention lives here; every other task is one file in tasks/ plus a line in tasks.MODULES.
+# Interface and a worked example: TASKS.md.
 
 class ConfidenceAbstention:
     """Kumaran et al. Phases 0/1/2/4 + verbal confidence (the module docstring has the flags)."""
@@ -371,26 +434,20 @@ class ConfidenceAbstention:
                     tag=f["tag"] or default_tag(f, "" if f["questions"] == "simpleqa" else "_" + f["questions"]))
 
     def run(self, ctx):
-        import pandas as pd
-
         cfg, base, thinking_active = ctx.cfg, ctx.base, ctx.thinking_active
         budget = ctx.max_tokens(4)  # paper: max_tokens=3 after "Answer:"
 
-        data = {p: pd.read_csv("/data/" + QUESTION_FILES[cfg["questions"]].format(p)) for p in (0, 1)}
+        data, arr = {}, {}
+        for p in (0, 1):
+            data[p], arr[p] = mc_items("/data/" + QUESTION_FILES[cfg["questions"]].format(p))
         qs = {p: data[p].head(cfg["n"]) for p in data}
-        arr = {p: arrangements(len(data[p])) for p in data}
         assert not set(data[0].question) & set(data[1].question), "phase 0/1 sets must be disjoint"
-
-        def choices(p, i):
-            row = data[p].iloc[i]
-            order, gt = arr[p][i]
-            return [row[f"choice_{k + 1}"] for k in order], gt, order
 
         exemplars, mc_shots, cloze_shots = [], "", ""
         if base:
             exemplars = base_exemplars(arr[0])
             for i in exemplars:
-                c, gt, _ = choices(0, i)
+                c, gt, _ = arranged_choices(data[0], arr[0], i)
                 mc_shots += mc_shot(data[0].question[i], c, gt)
                 cloze_shots += cloze_shot(data[0].question[i], data[0].choice_1[i])
 
@@ -406,7 +463,7 @@ class ConfidenceAbstention:
             for i in range(len(qs[src])):
                 if src == 0 and i in exemplars:  # an exemplar would be scored with its own answer in context
                     continue
-                c, gt, order = choices(src, i)
+                c, gt, order = arranged_choices(data[src], arr[src], i)
                 prompts.append(answer_prompt(phase, qs[src].iloc[i].question, c, threshold, cfg["phase2_prompt"]))
                 meta.append((i, c, gt, order))
             texts = [mc_shots + p for p in prompts]
@@ -420,25 +477,17 @@ class ConfidenceAbstention:
                   f"{len(prompts)} prompts in {time.time() - t0:.0f}s", flush=True)
             rows = []
             for n_row, (g, (i, c, gt, order)) in enumerate(zip(gens, meta)):
-                lps = digit_logprobs(g["top"], valid)
-                conf = softmax(lps)
-                ans, how = parse_answer(g["content"], lps, valid)
-                row = dict(phase=phase, threshold=threshold, question_index=i, question=qs[src].iloc[i].question,
-                           **{f"choice_{k + 1}_arranged": c[k] for k in range(4)},
-                           gt_position=gt, arrangement_order=str(order), prompt=prompts[n_row],
-                           generated_text=g["content"], final_answer=ans, is_correct=int(int(ans) == gt),
-                           is_nota=int(ans == "5"), logprob_chosen=lps[int(ans)],
-                           **{f"logprob_choice_{k}": lps[k] for k in range(1, 5)},
-                           **{f"confidence_{k}": conf[k] for k in range(1, 5)})
-                if 5 in valid:
-                    row.update(logprob_nota=lps[5], confidence_5=conf[5])
-                row.update(parse_method=how, thinking=cfg["thinking"], reasoning=g["reasoning"],
+                answer, lps = digit_readout(g, valid, gt)
+                row = dict(phase=phase, threshold=threshold,
+                           **mc_item_fields(i, qs[src].iloc[i].question, c, gt, order),
+                           prompt=prompts[n_row], **answer)
+                row.update(thinking=cfg["thinking"], reasoning=g["reasoning"],
                            reasoning_tokens=g["reasoning_tokens"], wait_count=g["wait_count"],
                            truncated=g["truncated"], generated_tokens=g["generated_tokens"],
                            finish_reason=g["finish_reason"], digit_mass=sum(math.exp(lps[v]) for v in valid))
                 if extra is not None:
-                    answers = [ans] + [parse_answer(e["content"], digit_logprobs(e["top"], valid), valid)[0]
-                                       for e in extra[n_row]]
+                    answers = [answer["final_answer"]] + [digit_readout(e, valid, gt)[0]["final_answer"]
+                                                          for e in extra[n_row]]
                     row.update(k_answers="|".join(answers), consistency=max(map(answers.count, answers)) / len(answers))
                 if scores is not None:
                     for k in range(1, 5):
@@ -469,7 +518,8 @@ class ConfidenceAbstention:
                                    reasoning_tokens=g["reasoning_tokens"], truncated=g["truncated"]))
             files["verbal.csv"] = verbal
 
-        rendered_example = ctx.render(mc_shots + answer_prompt(1, qs[1].question[0], choices(1, 0)[0]))
+        c = arranged_choices(data[1], arr[1], 0)[0]
+        rendered_example = ctx.render(mc_shots + answer_prompt(1, qs[1].question[0], c))
         return files, dict(budget=budget, arrangement_seed=1042, base_exemplars=exemplars,
                            rendered_example=rendered_example)
 
@@ -481,63 +531,17 @@ class ConfidenceAbstention:
             subprocess.run([sys.executable, "/analyze.py", str(out)], check=False)
 
 
-SHORT_ANSWER_FILE = "short_answer_questions.csv"
+def load_task(name):
+    """--task name -> task object. Other tasks are modules in tasks/, mounted only in run_image's containers."""
+    if name == ConfidenceAbstention.name:
+        return ConfidenceAbstention()
+    from tasks import module
+    return module(name).TASK
 
 
-def short_answer_prompt(q, base):
-    if base:  # completion format, preceded by the exemplars
-        return f"Question: {q}\nAnswer:"
-    return ("Answer the question with just the answer: a name, number or short phrase, no explanation.\n\n"
-            f"Question: {q}\nAnswer:")
-
-
-def normalize_answer(s):
-    s = re.sub(r"[^\w\s]", " ", str(s).lower())
-    return " ".join(w for w in s.split() if w not in ("a", "an", "the"))
-
-
-class ShortAnswer:
-    """Template task: free-form short answers scored by exact match against aliases (TASKS.md walks through it)."""
-    name = "short_answer"
-    options = {"shots": 4}  # exemplars in --thinking base mode; set with --task-opts shots=2
-
-    def config(self, f):
-        opts = parse_task_opts(f["task_opts"], self.options)
-        return dict(task=self.name, model=f["model"], thinking=f["thinking"], n=f["n"], budget=f["budget"],
-                    max_model_len=f["max_model_len"], temperature=f["temperature"], seed=f["seed"], tp=f["tp"],
-                    revision=f["revision"] or None, dtype=f["dtype"], **opts,
-                    tag=f["tag"] or default_tag(f, "_" + self.name))
-
-    def run(self, ctx):
-        import pandas as pd
-        cfg = ctx.cfg
-        df = pd.read_csv("/data/" + SHORT_ANSWER_FILE)  # file order is the item order: same items at every checkpoint
-        shots = df[df.split == "shot"].head(cfg["shots"])
-        test = df[df.split == "test"].head(cfg["n"]).reset_index(drop=True)
-        prefix = "".join(short_answer_prompt(q, True) + f" {a.split('|')[0]}\n\n"
-                         for q, a in zip(shots.question, shots.answer)) if ctx.base else ""
-        prompts = [short_answer_prompt(q, ctx.base) for q in test.question]
-        gens = [g[0] for g in ctx.generate([prefix + p for p in prompts], ctx.max_tokens(16),
-                                           **({"stop": ["\n"]} if ctx.base else {}))]
-        rows = []
-        for i, (r, p, g) in enumerate(zip(test.itertuples(), prompts, gens)):
-            gold = {normalize_answer(a) for a in r.answer.split("|")}
-            rows.append(dict(question_index=i, question=r.question, answer=r.answer, prompt=p,
-                             generated_text=g["content"], is_correct=int(normalize_answer(g["content"]) in gold),
-                             answer_words=len(g["content"].split()), thinking=cfg["thinking"],
-                             reasoning=g["reasoning"], reasoning_tokens=g["reasoning_tokens"],
-                             truncated=g["truncated"], generated_tokens=g["generated_tokens"],
-                             finish_reason=g["finish_reason"]))
-        return {"answers.csv": rows}, dict(budget=ctx.max_tokens(16), rendered_example=ctx.render(prefix + prompts[0]))
-
-    def analyze(self, cfg, out):
-        import pandas as pd
-        a = pd.read_csv(out / "answers.csv")
-        return dict(run=out.name, n=len(a), accuracy=round(a.is_correct.mean(), 3),
-                    short_format=round((a.answer_words <= 5).mean(), 3), truncated=int(a.truncated.sum()))
-
-
-TASKS = {t.name: t for t in (ConfidenceAbstention(), ShortAnswer())}
+def task_names():
+    from tasks import MODULES
+    return [ConfidenceAbstention.name, *MODULES]
 
 
 def parse_task_opts(s, defaults):
@@ -555,8 +559,8 @@ def parse_task_opts(s, defaults):
 
 # retries: containers intermittently read a corrupt site-packages file at startup ("bad marshal data");
 # a fresh container succeeds
-@app.function(volumes={"/cache": cache, "/results": results}, secrets=[hf_secret], timeout=8 * 60 * 60,
-              memory=65536, retries=modal.Retries(max_retries=2, initial_delay=10.0))
+@app.function(image=run_image, volumes={"/cache": cache, "/results": results}, secrets=[hf_secret],
+              timeout=8 * 60 * 60, memory=65536, retries=modal.Retries(max_retries=2, initial_delay=10.0))
 def run(cfg: dict) -> str:
     import json
 
@@ -566,7 +570,7 @@ def run(cfg: dict) -> str:
     from vllm import LLM
 
     # confidence_abstention configs carry no "task" key
-    task = TASKS[cfg.get("task", "confidence_abstention")]
+    task = load_task(cfg.get("task", "confidence_abstention"))
     llm = LLM(model=cfg["model"], revision=cfg["revision"], tokenizer_revision=cfg["revision"], dtype=cfg["dtype"],
               tensor_parallel_size=cfg["tp"], max_model_len=cfg["max_model_len"],
               gpu_memory_utilization=0.92, enable_prefix_caching=True, seed=cfg["seed"])
@@ -608,18 +612,31 @@ def main(model: str = "Qwen/Qwen3-30B-A3B-Thinking-2507", thinking: str = "nativ
          revision: str = "", questions: str = "simpleqa", k_samples: int = 1, base_phase2_verbal: bool = False,
          dtype: str = "auto", task: str = "confidence_abstention", task_opts: str = ""):
     assert thinking in ("native", "on", "off", "base")
-    if task not in TASKS:
-        raise SystemExit(f"--task must be one of {sorted(TASKS)}")
+    if task not in task_names():
+        raise SystemExit(f"--task must be one of {sorted(task_names())}")
     if thinking == "off" and "think" in model.lower():
         raise SystemExit("thinking-only checkpoints cannot run with --thinking off; use a hybrid (e.g. Qwen/Qwen3-8B)")
-    if task_opts and not TASKS[task].options:
+    if task_opts and not load_task(task).options:
         raise SystemExit(f"--task {task} takes no --task-opts")
     flags = dict(locals(), tp=int(gpu.split(":")[1]) if ":" in gpu else 1)
-    cfg = TASKS[task].config(flags)
+    cfg = load_task(task).config(flags)
     # spawn, don't wait: a client blocked on .remote() cancels the run if it crashes (e.g. a Wi-Fi/DNS blip),
     # even under --detach. A detached app keeps its last-triggered function alive if the client dies.
     call = run.with_options(gpu=gpu).spawn(cfg)
     print(f"spawned {cfg['tag']}: {call.object_id}; progress: modal app logs <app id above>")
+
+
+@app.function(image=run_image, timeout=10 * 60)
+def import_tasks() -> str:
+    from importlib.metadata import version
+    return f"vllm {version('vllm')}; " + ", ".join(f"{n}: {type(load_task(n)).__name__}" for n in task_names())
+
+
+@app.local_entrypoint()
+def check_tasks():
+    """CPU only, seconds: every registered task imports in a run container.
+        modal run abstention_modal.py::check_tasks"""
+    print(import_tasks.remote())
 
 
 @app.function(volumes={"/cache": cache, "/results": results}, secrets=[hf_secret], timeout=8 * 60 * 60,

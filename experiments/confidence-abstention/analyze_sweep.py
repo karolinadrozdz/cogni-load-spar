@@ -9,9 +9,10 @@ difficulty cancels. tau stays at each run's Phase 0 fit. A measure is NaN where 
 verbal pass in base mode, no trace when not thinking). The gate_A/B/C columns say whether each tier's measures
 mean anything for that checkpoint (None = tier not measured).
 
-The measures depend on the task the runs used (params.json "task"; absent = confidence_abstention): each entry of
-SWEEP_TASKS gives items(run_dir) -> one row per item, indexed by item id, with a `question` column (checked to match
-across runs); measures(items) -> dict of floats; gates(measures, ci_lo) -> dict of gate_* flags; show = columns printed.
+The measures depend on the task the runs used (params.json "task"; absent = confidence_abstention): SWEEP_TASKS, or
+the task's module in tasks/, gives items(run_dir) -> one row per item, indexed by item id, with a `question` column
+(checked to match across runs); measures(items) -> dict of floats; gates(measures, ci_lo) -> dict of gate_* flags;
+show = columns printed.
 The bootstrap, paired differences and same-items check are shared. Adding a task: TASKS.md.
 """
 
@@ -62,25 +63,6 @@ def items(d):
     return t.set_index("question_index")
 
 
-def short_answer_items(d):
-    a = pd.read_csv(d / "answers.csv")
-    t = a[["question_index", "question", "is_correct", "truncated", "reasoning_tokens"]].copy()
-    t["short"] = (a.answer_words <= 5).astype(int)
-    return t.set_index("question_index")
-
-
-def short_answer_measures(t):
-    y = t.is_correct.to_numpy()
-    return dict(accuracy=y.mean(), short_format=t.short.mean(),
-                auroc_neg_trace_len=auroc(y, -t.reasoning_tokens.to_numpy()) if t.reasoning_tokens.max() > 0 else np.nan,
-                truncated=t.truncated.mean())
-
-
-def short_answer_gates(m, lo):
-    """Accuracy only measures knowledge where the model answers in the short format."""
-    return dict(gate_format=bool(m["short_format"] >= 0.9 and m["truncated"] < 0.05))
-
-
 def mean_or_nan(x):
     return float(np.mean(x)) if len(x) else np.nan
 
@@ -129,9 +111,16 @@ SWEEP_TASKS = {
     "confidence_abstention": dict(items=items, measures=measures, gates=gates,
                                   show=["accuracy", "auroc_cal", "cloze_accuracy", "cloze_auroc_cal", "auroc_verbal",
                                         "abstention_gap", "auroc_neg_trace_len"]),
-    "short_answer": dict(items=short_answer_items, measures=short_answer_measures, gates=short_answer_gates,
-                         show=["accuracy", "short_format", "auroc_neg_trace_len"]),
 }
+
+
+def sweep_task(name):
+    """SWEEP_TASKS[name], else the hooks of the task's own module in tasks/."""
+    if name in SWEEP_TASKS:
+        return SWEEP_TASKS[name]
+    from tasks import module
+    m = module(name)
+    return dict(items=m.items, measures=m.measures, gates=m.gates, show=m.show)
 
 
 def run_params(d):
@@ -147,7 +136,7 @@ def main():
     rng = np.random.default_rng(0)
     names = {run_params(d).get("task", "confidence_abstention") for d in a.runs}
     assert len(names) == 1, f"runs are from different tasks: {names}"
-    task = SWEEP_TASKS[names.pop()]
+    task = sweep_task(names.pop())
     measures, gates = task["measures"], task["gates"]
     tables = [task["items"](d) for d in a.runs]
 

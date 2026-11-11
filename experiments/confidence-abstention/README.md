@@ -9,9 +9,15 @@ on, via vLLM on Modal. Prompts, option shuffle, logprob readout and CSV schema a
 list, the cached-weights volume, prefetch, batch launching, sweep statistics), the design rules and the costs.
 
 ## Files
-- `abstention_modal.py` — the runner and tasks (`main`), the in-trace probe (`checkpoints`), the probe's
-  start-checkpoint format check (`start_format`) and weight prefetch (`prefetch`); see docstring for all flags
-- `TASKS.md` — adding a task; reusable infrastructure; checkpoint list and costs
+- `abstention_modal.py` — the runner and the `confidence_abstention` task (`main`), the in-trace probe
+  (`checkpoints`), the probe's start-checkpoint format check (`start_format`), weight prefetch (`prefetch`) and a
+  CPU import check of the task registry (`check_tasks`); see docstring for all flags
+- `tasks/` — every other task, one module each, registered in `tasks/__init__.py` (`short_answer.py`: the worked example)
+- `grading_modal.py`, `graders/` — post-hoc CPU grading of a finished run in each grader's own image
+  (`exact_match.py`: the worked example)
+- `TASKS.md` — adding a task or a grader; reusable infrastructure; checkpoint list and costs
+- `test_harness_local.py` — CPU check that the runner's outputs are unchanged against a reference revision, and that
+  `Context.render` reproduces every local run's `rendered_example`
 - `data/short_answer_questions.csv` — items for the `short_answer` example task
 - `analyze.py` — the paper's two headline tests on one run directory
 - `analyze_checkpoints.py` — analysis of the in-trace confidence checkpoints (below)
