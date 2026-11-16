@@ -8,6 +8,7 @@ import importlib
 
 MODULES = {
     "short_answer": "tasks.short_answer",
+    "predict_before": "tasks.predict_before",
 }
 
 
