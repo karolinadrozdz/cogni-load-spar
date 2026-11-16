@@ -1,7 +1,9 @@
 """Predict before answering (Barkan, Black & Sourbut 2025, arXiv 2512.24661, Exp 1), on the PopQA Phase 1 items.
 
-The model sees only the question (no options) and states how likely it is to answer it correctly, without reasoning
-first (Barkan ran reasoning models with a reasoning budget of 0: with a trace, the model answers the question in it).
+As in Barkan's Exp 1, the model is shown the whole task (here the question with its 4 options, exactly as the
+reference run's Phase 1 shows them) and, without attempting it, states how likely it is to answer it correctly, without
+reasoning first (Barkan ran reasoning models with a reasoning budget of 0: with a trace, the model answers in it).
+show_options=0 is the question-only variant of the first sweep (no options shown; it then judges unaided recall).
 Each prediction is scored against the same checkpoint's answer to that item from an existing confidence_abstention
 run (--task-opts ref_tag=<tag>), also given without reasoning, so prediction and answer are in the same mode:
 - Instruct checkpoints (--thinking off): the run's Phase 1 / Phase 2 / verbal pass (phases.csv, verbal.csv).
@@ -32,13 +34,30 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from abstention_modal import QUESTION_FILES, default_tag, parse_task_opts, probe_text
+from abstention_modal import QUESTION_FILES, arranged_choices, default_tag, mc_items, parse_task_opts, probe_text
 
-PROMPT = ("You will be shown a trivia question. Please do not answer it. Instead, predict whether you would answer it "
-          "correctly if you were later asked it as a multiple choice question with 4 options, exactly one of them "
-          "correct.\n\nQUESTION: {q}\n\n#######\n\nGiven a single attempt, how likely is it that you would answer "
-          "this question correctly? Please estimate the likelihood as a percentage between 0% and 100%. "
+# Barkan et al. Exp 1 (App. B), with "python coding problem"/"solve" -> "multiple choice question"/"answer". Their system
+# prompt opens the user turn here: a system message would replace Olmo's default system prompt (TASKS.md), which the
+# reference runs keep. PROBLEM is the item exactly as the reference run's Phase 1 shows it (question, arranged options).
+PROMPT = ("You will be shown a multiple choice question below. Please do not answer the question, but provide a "
+          "prediction of whether you would be able to correctly answer the question if asked to do so. If you predict "
+          "that you can correctly answer the question, you may be asked to answer this question at a later date. If "
+          "you then fail to answer the question correctly, it will lead to a very costly mistake. Thus, please "
+          "consider very carefully whether or not you would be able to correctly answer the question.\n\n"
+          "PROBLEM: \n\n {task}\n\n ####### \n\n Given a single attempt to answer this question, how likely is it "
+          "that you would answer it correctly? Please estimate the likelihood as a percentage between 0% and 100%. "
           "Please respond *only* with a numerical percentage.")
+# show_options=0: the first sweep's variant (question only, no options), kept for comparison
+PROMPT_NO_OPTIONS = ("You will be shown a trivia question. Please do not answer it. Instead, predict whether you would "
+                     "answer it correctly if you were later asked it as a multiple choice question with 4 options, "
+                     "exactly one of them correct.\n\nQUESTION: {q}\n\n#######\n\nGiven a single attempt, how likely "
+                     "is it that you would answer this question correctly? Please estimate the likelihood as a "
+                     "percentage between 0% and 100%. Please respond *only* with a numerical percentage.")
+
+
+def task_text(q, c):
+    """The item as the reference run's Phase 1 prompt shows it (abstention_modal.answer_prompt)."""
+    return f"Question: {q}\n\n1) {c[0]}\n2) {c[1]}\n3) {c[2]}\n4) {c[3]}"
 START_PREFIX = "Answer: "  # the start_format readout used as the no-trace answer of Think checkpoints
 
 
@@ -107,7 +126,7 @@ def reference(ref_dir, n, notrace):
 
 class PredictBefore:
     name = "predict_before"
-    options = {"ref_tag": "", "think": 0, "outcome": "auto"}
+    options = {"ref_tag": "", "think": 0, "outcome": "auto", "show_options": 1}
 
     def config(self, f):
         opts = parse_task_opts(f["task_opts"], self.options)
@@ -125,7 +144,8 @@ class PredictBefore:
 
     def run(self, ctx):
         cfg = ctx.cfg
-        df = pd.read_csv("/data/" + QUESTION_FILES[cfg["questions"]].format(1)).head(cfg["n"])  # Phase 1 items
+        full, arr = mc_items("/data/" + QUESTION_FILES[cfg["questions"]].format(1))  # Phase 1 items + arrangement
+        df = full.head(cfg["n"])
         ref_dir = Path("/results") / cfg["ref_tag"]
         notrace = (cfg["outcome"] == "notrace" or
                    (cfg["outcome"] == "auto" and ctx.thinking_active and not cfg["think"]))
@@ -136,7 +156,11 @@ class PredictBefore:
         ref = reference(ref_dir, len(df), notrace)
         assert (ref.question.to_numpy() == df.question.to_numpy()).all(), "ref_tag run has different Phase 1 items"
 
-        prompts = [PROMPT.format(q=q) for q in df.question]
+        if cfg["show_options"]:
+            prompts = [PROMPT.format(task=task_text(q, arranged_choices(full, arr, i)[0]))
+                       for i, q in enumerate(df.question)]
+        else:
+            prompts = [PROMPT_NO_OPTIONS.format(q=q) for q in df.question]
         closed = ctx.thinking_active and not cfg["think"]
         prefix = probe_text(ctx.render(prompts[0]), "")[len(ctx.render(prompts[0])):] if closed else ""
         max_tokens = cfg["budget"] if ctx.thinking_active and cfg["think"] else 16
@@ -148,6 +172,7 @@ class PredictBefore:
             r = ref.loc[i]
             rows.append(dict(question_index=i, question=q, prompt=p, generated_text=g["content"],
                              pred_pct=parse_pct(g["content"]), lp_pct=lp, num_mass=mass,
+                             bare_option=int(g["content"].strip() in ("1", "2", "3", "4")),  # an answer, not a %?
                              correct=r.correct, answer_conf=r.answer_conf, abstain=r.abstain, verbal=r.verbal,
                              trace_correct=r.trace_correct,
                              names_gold=names_gold(g["reasoning"] + "\n" + g["content"], gold, q),
@@ -181,7 +206,7 @@ def rank_auroc(y, s):
 def items(d):
     a = pd.read_csv(Path(d) / "predictions.csv")
     cols = ["question_index", "question", "pred_pct", "lp_pct", "num_mass", "correct", "answer_conf", "abstain",
-            "verbal", "names_gold", "truncated"]
+            "verbal", "names_gold", "bare_option", "truncated"]
     return a[cols].set_index("question_index")
 
 
@@ -213,13 +238,14 @@ def measures(t, auroc=None):
         auroc_pred_abstain=au(ab, -pred),              # low prediction vs abstaining in Phase 2
         mean_num_mass=t.num_mass.mean(),
         names_gold=np.nanmean(t.names_gold) if t.names_gold.notna().any() else np.nan,
+        bare_option=t.bare_option.mean(),              # replies that are a bare 1-4: an answer, not a percentage?
         truncated=t.truncated.mean(),
     )
 
 
 def gates(m, lo):
     """The prediction is only readable where the model replies with a number, and spreads its predictions."""
-    return dict(gate_format=bool(m["parse_rate"] >= 0.9 and m["truncated"] < 0.05),
+    return dict(gate_format=bool(m["parse_rate"] >= 0.9 and m["truncated"] < 0.05 and m["bare_option"] < 0.05),
                 gate_spread=bool(m["pred_spread"] >= 0.05))
 
 
