@@ -59,16 +59,17 @@ def task_text(q, c):
     """The item as the reference run's Phase 1 prompt shows it (abstention_modal.answer_prompt)."""
     return f"Question: {q}\n\n1) {c[0]}\n2) {c[1]}\n3) {c[2]}\n4) {c[3]}"
 START_PREFIX = "Answer: "  # the start_format readout used as the no-trace answer of Think checkpoints
+REPLY_TOKENS = 50  # room for a sentence before the number ("I estimate the likelihood ... to be 70%")
 
 
 def parse_pct(text):
-    """First number 0-100 on the first non-empty line of the reply (Barkan: first integer on the first line)."""
-    line = next((s for s in text.splitlines() if s.strip()), "")
-    for m in re.finditer(r"\d+(?:\.\d+)?", line):
-        v = float(m.group())
-        if 0 <= v <= 100:
-            return v
-    return np.nan
+    """The model's stated percentage: the last "N%" (0-100) anywhere in the reply, its final estimate when it writes
+    a sentence first; else a reply that is only a number. Other numbers (years, "4 options") are not taken: NaN."""
+    pcts = [float(m) for m in re.findall(r"(\d+(?:\.\d+)?)\s*%", text) if 0 <= float(m) <= 100]
+    if pcts:
+        return pcts[-1]
+    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*\.?\s*", text)
+    return float(m.group(1)) if m and 0 <= float(m.group(1)) <= 100 else np.nan
 
 
 def lp_pct(top):
@@ -163,7 +164,7 @@ class PredictBefore:
             prompts = [PROMPT_NO_OPTIONS.format(q=q) for q in df.question]
         closed = ctx.thinking_active and not cfg["think"]
         prefix = probe_text(ctx.render(prompts[0]), "")[len(ctx.render(prompts[0])):] if closed else ""
-        max_tokens = cfg["budget"] if ctx.thinking_active and cfg["think"] else 16
+        max_tokens = cfg["budget"] if ctx.thinking_active and cfg["think"] else REPLY_TOKENS
         gens = [g[0] for g in ctx.generate(prompts, max_tokens, prefix=prefix)]
 
         rows = []
@@ -177,7 +178,9 @@ class PredictBefore:
                              trace_correct=r.trace_correct,
                              names_gold=names_gold(g["reasoning"] + "\n" + g["content"], gold, q),
                              thinking=cfg["thinking"], reasoning=g["reasoning"],
-                             reasoning_tokens=g["reasoning_tokens"], truncated=g["truncated"],
+                             reasoning_tokens=g["reasoning_tokens"],
+                             # a closed think block leaves the runner's flag at 0; a reply cut at max_tokens is cut too
+                             truncated=int(bool(g["truncated"]) or g["finish_reason"] == "length"),
                              generated_tokens=g["generated_tokens"], finish_reason=g["finish_reason"]))
         return {"predictions.csv": rows}, dict(prefix=prefix, outcome_source="start_format" if notrace else "phases",
                                                rendered_example=ctx.render(prompts[0], prefix))
