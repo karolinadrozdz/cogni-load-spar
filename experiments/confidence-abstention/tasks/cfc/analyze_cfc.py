@@ -90,6 +90,27 @@ def acc(t, cond, kind, C, drop, col="chosen_correct"):
     return s[col].mean(), wb(C, s, s[col]), len(s)
 
 
+def graded_acc(t, cond, kind, C, drop, internal=False):
+    """Secondary, graded measure (pre-registered after the pilots, before the main runs): CFC accuracy in which each
+    scored pair is weighted by the rank of the preference's strength, |pref_i - 0.5| (internal: |int_score_i -
+    int_score_j|). Rank weights make it independent of how sharp a checkpoint's probabilities are overall; with equal
+    weights it equals the plain accuracy. Chance = 0.5. Returns estimate, bootstrap distribution, n."""
+    s = scored(t, cond, kind, drop)
+    if internal:
+        s = s[np.isfinite(s.int_score_i) & np.isfinite(s.int_score_j) & s.int_correct.notna()]
+        strength, y = (s.int_score_i - s.int_score_j).abs(), s.int_correct
+    else:
+        strength, y = (s.pref_i - 0.5).abs(), s.chosen_correct
+    if not len(s):
+        return np.nan, np.full(C.shape[0], np.nan), 0
+    w = strength.rank(method="average").to_numpy()
+    y = y.to_numpy(float)
+    est = float((w * y).sum() / w.sum())
+    with np.errstate(divide="ignore", invalid="ignore"):
+        b = wb(C, s, w * y) / wb(C, s, w)
+    return est, b, len(s)
+
+
 def stage_diff(runs, a, b, C, drop, cond="P", kind="matched"):
     """Later (b) minus earlier (a) stated accuracy, same item resamples."""
     pa, ba, na = acc(runs[a]["t"], cond, kind, C, drop)
@@ -235,6 +256,13 @@ def main():
                     row[f"n_{cond}_{kind}"] = nn
                 pi, bi, _ = acc(t, cond, "all", C, False, col="int_correct")
                 row[f"{cond}_internal"] = fmt(pi, *ci(bi))
+                for kind in (("matched", "all") if cond == "P" else ("all",)):
+                    g, bg, _ = graded_acc(t, cond, kind, C, False)
+                    gi, bgi, _ = graded_acc(t, cond, kind, C, False, internal=True)
+                    row[f"G_{cond}_{kind}"] = fmt(g, *ci(bg))
+                    row[f"G_{cond}_{kind}_internal"] = fmt(gi, *ci(bgi))
+                    res.setdefault("graded", {}).setdefault(k, {})[f"{cond}_{kind}"] = dict(
+                        stated=g, stated_lo=ci(bg)[0], stated_hi=ci(bg)[1], internal=gi)
                 m = condition_metrics(t[t.condition == cond])
                 res.setdefault("per_run", {}).setdefault(k, {})[cond] = {
                     kk: (float(v) if isinstance(v, (int, float, np.floating, np.integer)) else v) for kk, v in m.items()}
@@ -246,8 +274,10 @@ def main():
         df = pd.DataFrame(table).set_index("run")
         with pd.option_context("display.width", 250, "display.max_columns", 50):
             print("\nStated (chosen_correct) and internal accuracy, 95% CI; P diagnostics:")
-            print(df[[c for c in df.columns if not c.startswith("n_") and not c.startswith("P_") or c in
+            print(df[[c for c in df.columns if (not c.startswith(("n_", "P_", "G_"))) or c in
                       ("P_matched", "P_random", "P_all", "P_internal")]].to_string())
+            print("\nSecondary, graded (strength-rank-weighted) accuracy, 95% CI; stated vs internal:")
+            print(df[[c for c in df.columns if c.startswith("G_")]].to_string())
             print(df[[c for c in df.columns if c.startswith("P_") and c not in
                       ("P_matched", "P_random", "P_all", "P_internal")] + [c for c in df.columns if c.startswith("n_")]]
                   .to_string())
@@ -273,6 +303,15 @@ def main():
                 print(f"H2b {line} DPO->RL: {d:+.3f}, 90% CI [{lo90:+.3f}, {hi90:+.3f}], TOST p {p_tost:.4f}, "
                       f"{'equivalent' if res[f'H2b_{line}']['equivalent'] else 'NOT shown equivalent'} "
                       f"(margin {MARGIN})")
+        print("Secondary (graded), stage differences in stated P graded accuracy on matched pairs, not in Holm:")
+        for x, y in (("instruct-sft", "instruct-dpo"), ("instruct-dpo", "instruct-rl"),
+                     ("think-sft-main", "think-dpo"), ("think-dpo", "think-rl31-main")):
+            if {x, y} <= set(runs):
+                gx, bx, _ = graded_acc(runs[x]["t"], "P", "matched", C, drop)
+                gy, by, _ = graded_acc(runs[y]["t"], "P", "matched", C, drop)
+                res.setdefault("graded_stage_diffs", {})[f"{x}->{y}"] = dict(diff=gy - gx, lo=ci(by - bx)[0],
+                                                                              hi=ci(by - bx)[1])
+                print(f"  {x} -> {y}: {fmt(gy - gx, *ci(by - bx))}")
         print("Stage differences (stated P accuracy), descriptive:")
         for line, keys in (("Instruct", ("instruct-sft", "instruct-dpo", "instruct-rl")),
                            ("Think", ("think-sft-main", "think-dpo", "think-rl31-main"))):

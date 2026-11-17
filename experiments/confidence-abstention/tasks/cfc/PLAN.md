@@ -127,6 +127,13 @@ Which of the two answers is more likely to be correct? Respond only with A or B.
 
 **Bootstrap scheme:** resample items; weight each pair by the product of its two items' resample counts; recompute the scored-pair set inside each resample. The naïve ±0.012 assumes independent pairs and is too optimistic.
 
+
+**Secondary, graded measure** (added after the pilots and before the main runs; not part of the Holm-corrected primary tests):
+- **Why:** in the pilots the greedy A/B choice was mostly positional (54–81% of pairs got the same letter in both orders), and preferences sat close to 50/50. The plain choice therefore throws away the strength of the preference.
+- **Measure:** *graded CFC accuracy*. Each scored pair is weighted by the rank of its preference strength |pref − 0.5|; the internal counterpart uses |internal score difference|. The weighted share of correct choices is reported per run and condition.
+- **Properties:** chance = 0.5; with equal weights it equals the plain accuracy. Because rank weights ignore how sharp a checkpoint's probabilities are overall, it is comparable across stages.
+- **Reported:** per run and condition, plus the stage differences on matched P pairs (SFT → DPO, DPO → RL), with the same item bootstrap.
+
 ## Controls
 
 - **System prompt at RL: not run.** Artemis's runs with the DPO-era system prompt (`think-rl31-main-sys30`, `think-rl-main-sys31`) exist only **with** thinking (no start_format readout), and they use a harness option (`chat_template_from`) that is not in this branch. The RL system-prompt confound therefore stays a stated limitation.
