@@ -1,0 +1,232 @@
+{
+  "checked_utc": "2026-11-18T03:30:50.879647+00:00",
+  "model": "IFM/K2-Horizon-32B",
+  "code_baseline": "185649cb96002224a40c31f50973f823762a388d",
+  "revisions": [
+    {
+      "revision": "pretrain_100000",
+      "sha": "cd7ba4a6f450e4c2d319ab1072266f432eb030e3",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_200000",
+      "sha": "44c1189484137a9ae831ac731b858fe06234d6e6",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_300000",
+      "sha": "3d07aa2f25bd9a49ced89b69c21933a40e9632ce",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_400000",
+      "sha": "7e6db66c6844f80902237929744458a4aa9fff23",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_500000",
+      "sha": "d6a08a7f762615c6f72344c38f5fd3309f31b826",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_600000",
+      "sha": "8369905832782c94de829eb758858423fea59c0a",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_700000",
+      "sha": "6f0971d4f572c54fcf54ef86ce0fe33cb75111de",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_800000",
+      "sha": "87f5a3b38ad2c12207949419ca77030920783113",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_900000",
+      "sha": "adb5e81f7880182641355d8a2ece48ffe89442bc",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_1000000",
+      "sha": "f500cd237ef0761ed554a6f7edd628587ee2b8f1",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "pretrain_1100000",
+      "sha": "62c862fffffa4955792d5ed89d3101e300b66115",
+      "max_position_embeddings": 8192,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "mid_1_55000",
+      "sha": "78e79015c7c19967b880406ef6de292ede9c4308",
+      "max_position_embeddings": 32768,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "mid_2_25000",
+      "sha": "1bd90aae67dddf3cac93cc1888fe337390f02284",
+      "max_position_embeddings": 131072,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "mid_3_5500",
+      "sha": "1f714e73e5d2bb11aff46785a76ceacbf0e4cac2",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "mid_4_3000",
+      "sha": "19e60161ee24ff7ce11aa53a8d35da50d09c64dc",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "mid_4_6000",
+      "sha": "af70e555b3c72823e2408e2b003b3e0d808b5c98",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "mid_4_10000",
+      "sha": "7a382d1d7e76e36017bf0aa6afc814b251cc1d00",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "sft_1_1000",
+      "sha": "929fe2e054ffa5f09611785aa6022552b2993bab",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "sft_1_3000",
+      "sha": "9124003526eace95f957abb3caa7f69854d8bf7c",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "sft_1_6000",
+      "sha": "be9e675f9e8f6505f31929235b2710251ef7bb8f",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "sft_1_11000",
+      "sha": "b8a81b9641791fe476a6434bea4f345cd1cfbe6c",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "sft_2_500",
+      "sha": "4370552cef40c79a18928ec041b2205a2a343ed4",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "sft_2_1500",
+      "sha": "1e60361ca9698a9672d0c7c06108b31f5f9efdd2",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "sft_2_2500",
+      "sha": "e51934d3ffcfdfe0e81dc028d7b1a6607e80ae0e",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    },
+    {
+      "revision": "main",
+      "sha": "4747a54389ea187eb9e28dc43c0af10a374090f1",
+      "max_position_embeddings": 524288,
+      "architecture": [
+        "K2HorizonForCausalLM"
+      ],
+      "layers": 64
+    }
+  ]
+}

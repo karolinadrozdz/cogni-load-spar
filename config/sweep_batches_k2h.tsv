@@ -1,0 +1,29 @@
+1	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_100000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_100000
+1	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_200000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_200000
+1	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_300000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_300000
+1	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_400000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_400000
+1	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_500000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_500000
+2	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_600000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_600000
+2	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_700000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_700000
+2	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_800000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_800000
+2	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_900000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_900000
+2	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_1000000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_1000000
+3	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision pretrain_1100000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-base-pretrain_1100000
+3	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision mid_1_55000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-mid-mid_1_55000
+3	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision mid_2_25000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-mid-mid_2_25000
+3	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision mid_3_5500 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-mid-mid_3_5500
+3	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision mid_4_3000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-mid-mid_4_3000
+4	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision mid_4_6000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-mid-mid_4_6000
+4	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision mid_4_10000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-mid-mid_4_10000
+4	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision sft_1_1000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-bridge-sft_1_1000
+4	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision sft_1_11000 --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-bridge-sft_1_11000
+4	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision main --thinking base --questions popqa --gpu H200 --tag k2h32b-popqa-bridge-main
+5	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision sft_1_1000 --thinking native --budget 32768 --max-model-len 34816 --k-samples 5 --questions popqa --gpu H200 --tag k2h32b-popqa-think-sft_1_1000
+5	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision sft_1_3000 --thinking native --budget 32768 --max-model-len 34816 --questions popqa --gpu H200 --tag k2h32b-popqa-think-sft_1_3000
+5	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision sft_1_6000 --thinking native --budget 32768 --max-model-len 34816 --questions popqa --gpu H200 --tag k2h32b-popqa-think-sft_1_6000
+5	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision sft_1_11000 --thinking native --budget 32768 --max-model-len 34816 --questions popqa --gpu H200 --tag k2h32b-popqa-think-sft_1_11000
+5	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision sft_2_500 --thinking native --budget 32768 --max-model-len 34816 --questions popqa --gpu H200 --tag k2h32b-popqa-think-sft_2_500
+6	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision sft_2_1500 --thinking native --budget 32768 --max-model-len 34816 --questions popqa --gpu H200 --tag k2h32b-popqa-think-sft_2_1500
+6	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision sft_2_2500 --thinking native --budget 32768 --max-model-len 34816 --k-samples 5 --questions popqa --gpu H200 --tag k2h32b-popqa-think-sft_2_2500
+6	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision main --thinking native --budget 32768 --max-model-len 34816 --k-samples 5 --questions popqa --gpu H200 --tag k2h32b-popqa-think-main
+6	modal run --detach abstention_modal.py::main --model IFM/K2-Horizon-32B --revision main --thinking native --budget 32768 --max-model-len 34816 --temperature 1.0 --questions popqa --gpu H200 --tag k2h32b-popqa-card-main
